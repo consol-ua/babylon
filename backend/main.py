@@ -1,13 +1,14 @@
+import os
 import asyncio
-from typing import List, Optional, Set
+from typing import Optional, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from audio_engine import AudioEngine
-from ai_pipeline import AIPipeline
+from ai_pipeline import GeminiLiveAudioPipeline
 
-app = FastAPI(title="Voiceover & Translation Backend")
+app = FastAPI(title="macOS Gemini Live Voiceover Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,16 +18,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Engine Instances
+# Global Engines
 audio_engine = AudioEngine()
-ai_pipeline = AIPipeline()
+ai_pipeline = GeminiLiveAudioPipeline(
+    api_key=os.environ.get("GEMINI_API_KEY", ""),
+    target_lang="uk",
+)
 
-# State models
 class StartRequest(BaseModel):
     input_device_index: Optional[int] = None
     output_device_index: Optional[int] = None
-    source_lang: str = "en-US"
     target_lang: str = "uk"
+    api_key: Optional[str] = None
 
 class DuckingRequest(BaseModel):
     ducking_factor: float
@@ -41,7 +44,7 @@ class AppState:
 
 state = AppState()
 
-# WebSocket Connection Manager
+# WebSocket Manager
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: Set[WebSocket] = set()
@@ -62,7 +65,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Link Callbacks
+# Callbacks
 def on_telemetry(db: float, is_ducking: bool) -> None:
     state.volume_level_db = db
     state.is_ducking = is_ducking
@@ -77,7 +80,7 @@ audio_engine.telemetry_callback = on_telemetry
 ai_pipeline.on_stt_result = on_stt_result
 ai_pipeline.on_translated_result = on_translated_result
 
-# Background loop to broadcast state to clients over WebSocket
+# 20 FPS Broadcast Loop
 async def state_broadcast_loop() -> None:
     while True:
         if manager.active_connections:
@@ -90,7 +93,7 @@ async def state_broadcast_loop() -> None:
                     "is_ducking": state.is_ducking,
                 }
             )
-        await asyncio.sleep(0.05)  # 20 FPS updates
+        await asyncio.sleep(0.05)
 
 @app.on_event("startup")
 async def startup_event() -> None:
@@ -103,19 +106,19 @@ def get_devices():
 
 @app.post("/start")
 async def start_pipeline(req: StartRequest):
-    """Start audio capture, translation, and mixing."""
+    """Start audio capture and Gemini Live streaming translation."""
     if state.is_translating:
         return {"status": "already_running"}
 
-    ai_pipeline.source_lang = req.source_lang
+    if req.api_key:
+        ai_pipeline.set_api_key(req.api_key)
     ai_pipeline.target_lang = req.target_lang
 
     audio_engine.start(
         input_device_index=req.input_device_index,
         output_device_index=req.output_device_index,
     )
-    
-    # Launch async workers
+
     asyncio.create_task(audio_engine.process_loop())
     asyncio.create_task(
         ai_pipeline.run(audio_engine.input_queue, audio_engine.tts_playback_queue)
@@ -126,7 +129,7 @@ async def start_pipeline(req: StartRequest):
 
 @app.post("/stop")
 def stop_pipeline():
-    """Stop audio capture and AI processing."""
+    """Stop live audio and AI stream."""
     audio_engine.stop()
     ai_pipeline.stop()
     state.is_translating = False
@@ -134,7 +137,7 @@ def stop_pipeline():
 
 @app.post("/ducking")
 def set_ducking(req: DuckingRequest):
-    """Update audio ducking factor (0.0 - 1.0)."""
+    """Update ducking level."""
     audio_engine.set_ducking_factor(req.ducking_factor)
     return {"ducking_factor": audio_engine.ducking_factor}
 

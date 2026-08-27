@@ -8,12 +8,35 @@ import {
   AudioDevice,
   BackendState,
 } from "./api";
-import { Mic, Volume2, Radio, Activity, VolumeX, Play, Square } from "lucide-react";
+import {
+  Mic,
+  Volume2,
+  Radio,
+  Activity,
+  VolumeX,
+  Play,
+  Square,
+  Globe,
+  Key,
+} from "lucide-react";
+
+const SUPPORTED_LANGUAGES = [
+  { code: "uk", label: "Ukrainian (Українська)" },
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish (Español)" },
+  { code: "de", label: "German (Deutsch)" },
+  { code: "fr", label: "French (Français)" },
+  { code: "pl", label: "Polish (Polski)" },
+  { code: "ja", label: "Japanese (日本語)" },
+  { code: "zh", label: "Chinese (中文)" },
+];
 
 export const App: React.FC = () => {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [selectedInput, setSelectedInput] = useState<number | undefined>();
   const [selectedOutput, setSelectedOutput] = useState<number | undefined>();
+  const [targetLang, setTargetLang] = useState<string>("uk");
+  const [apiKey, setApiKey] = useState<string>("");
   const [duckingFactor, setDuckingFactor] = useState<number>(0.2);
 
   const [backendState, setBackendState] = useState<BackendState>({
@@ -26,7 +49,6 @@ export const App: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Fetch audio input/output devices on mount
   useEffect(() => {
     fetchAudioDevices().then((devs) => {
       setDevices(devs);
@@ -51,12 +73,12 @@ export const App: React.FC = () => {
       if (backendState.is_translating) {
         await stopTranslation();
       } else {
-        await startTranslation(selectedInput, selectedOutput, "en-US", "uk");
+        await startTranslation(selectedInput, selectedOutput, targetLang, apiKey);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [backendState.is_translating, selectedInput, selectedOutput]);
+  }, [backendState.is_translating, selectedInput, selectedOutput, targetLang, apiKey]);
 
   const handleDuckingChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +92,6 @@ export const App: React.FC = () => {
   const inputDevices = devices.filter((d) => d.max_input_channels > 0);
   const outputDevices = devices.filter((d) => d.max_output_channels > 0);
 
-  // Normalize dB value for VU meter [ -60dB -> 0dB ] => [ 0% -> 100% ]
   const volumePercentage = Math.max(
     0,
     Math.min(100, ((backendState.volume_db + 60) / 60) * 100)
@@ -83,10 +104,10 @@ export const App: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold tracking-wide flex items-center gap-2">
             <Radio className="w-5 h-5 text-indigo-400 animate-pulse" />
-            macOS Audio Voiceover & Real-Time Translation
+            Gemini 3.5 Live Translation & Voiceover
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            PyAudio Sidecar + Coqui XTTS (Apple Silicon MPS) + Google STT
+            Real-Time Bidirectional Speech Translation (gemini-3.5-live-translate-preview) + Audio Ducking
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -98,24 +119,60 @@ export const App: React.FC = () => {
             }`}
           />
           <span className="text-xs uppercase font-semibold text-slate-400">
-            {backendState.is_translating ? "Live" : "Idle"}
+            {backendState.is_translating ? "Live Streaming" : "Idle"}
           </span>
         </div>
       </header>
 
-      {/* Main Grid */}
+      {/* Main Layout */}
       <main className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
         {/* Left Column: Controls & Devices */}
-        <section className="space-y-6 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+        <section className="space-y-5 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase text-slate-400 tracking-wider">
-            Audio Routing & Controls
+            Audio & Model Configuration
           </h2>
 
+          {/* Gemini API Key */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+              <Key className="w-4 h-4 text-indigo-400" />
+              Gemini API Key (or set GEMINI_API_KEY env)
+            </label>
+            <input
+              type="password"
+              placeholder="AIzaSy..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              disabled={backendState.is_translating}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-mono"
+            />
+          </div>
+
+          {/* Target Language */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+              <Globe className="w-4 h-4 text-indigo-400" />
+              Target Voiceover Language
+            </label>
+            <select
+              value={targetLang}
+              onChange={(e) => setTargetLang(e.target.value)}
+              disabled={backendState.is_translating}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            >
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Input Device Selection */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
               <Mic className="w-4 h-4 text-indigo-400" />
-              Input Device (Microphone / BlackHole Virtual Cable)
+              Input Device (Microphone / BlackHole Virtual Audio)
             </label>
             <select
               value={selectedInput}
@@ -132,7 +189,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Output Device Selection */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
               <Volume2 className="w-4 h-4 text-indigo-400" />
               Output Device (Speakers / Headphones)
@@ -156,7 +213,7 @@ export const App: React.FC = () => {
             <div className="flex justify-between items-center">
               <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
                 <VolumeX className="w-4 h-4 text-indigo-400" />
-                Sidechain Ducking Level
+                Ducking Level (Original Audio Attenuation)
               </label>
               <span className="text-xs font-mono font-medium text-indigo-400">
                 {Math.round(duckingFactor * 100)}%
@@ -171,17 +228,14 @@ export const App: React.FC = () => {
               onChange={handleDuckingChange}
               className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
-            <p className="text-[11px] text-slate-500">
-              Lowers the original audio to this percentage while the translation is speaking.
-            </p>
           </div>
 
-          {/* VU Meter & Ducking Indicator */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
+          {/* VU Meter */}
+          <div className="space-y-1.5 pt-2 border-t border-slate-800">
             <div className="flex justify-between items-center text-xs">
               <span className="text-slate-400 flex items-center gap-1">
                 <Activity className="w-3.5 h-3.5 text-indigo-400" />
-                Live Level
+                Input Level
               </span>
               <span className="font-mono text-slate-400">
                 {backendState.volume_db.toFixed(1)} dB
@@ -197,13 +251,13 @@ export const App: React.FC = () => {
             </div>
             {backendState.is_ducking && (
               <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase">
-                Ducking Engaged
+                Ducking Engaged (Speaking)
               </span>
             )}
           </div>
 
           {/* Action Button */}
-          <div className="pt-4">
+          <div className="pt-2">
             <button
               onClick={handleToggleTranslation}
               disabled={isLoading}
@@ -215,11 +269,11 @@ export const App: React.FC = () => {
             >
               {backendState.is_translating ? (
                 <>
-                  <Square className="w-4 h-4" /> Stop Translation
+                  <Square className="w-4 h-4" /> Stop Live Session
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4" /> Start Real-Time Translation
+                  <Play className="w-4 h-4" /> Start Gemini Live Translate
                 </>
               )}
             </button>
@@ -229,33 +283,33 @@ export const App: React.FC = () => {
         {/* Right Column: Live Transcripts */}
         <section className="space-y-4 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col">
           <h2 className="text-sm font-semibold uppercase text-slate-400 tracking-wider">
-            Live Stream Transcripts
+            Live Streaming Transcripts
           </h2>
 
           <div className="flex-1 flex flex-col space-y-4">
-            {/* Speech-To-Text Output */}
-            <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col">
+            {/* Input Transcription */}
+            <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3.5 flex flex-col">
               <span className="text-[11px] font-semibold uppercase text-indigo-400 mb-1">
-                Source Speech (Original)
+                Source Speech Transcript (Gemini Live STT)
               </span>
               <div className="flex-1 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed">
                 {backendState.stt_text || (
                   <span className="text-slate-600 italic">
-                    Waiting for incoming voice...
+                    Waiting for incoming audio stream...
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Translation Output */}
-            <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col">
+            {/* Target Translation */}
+            <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3.5 flex flex-col">
               <span className="text-[11px] font-semibold uppercase text-emerald-400 mb-1">
-                Target Translation & Voiceover
+                Target Live Translation Transcript
               </span>
               <div className="flex-1 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed">
                 {backendState.translated_text || (
                   <span className="text-slate-600 italic">
-                    Translations will appear and speak here...
+                    Translated speech will appear and stream here...
                   </span>
                 )}
               </div>

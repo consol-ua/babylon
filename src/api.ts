@@ -32,8 +32,8 @@ export async function fetchAudioDevices(): Promise<AudioDevice[]> {
 export async function startTranslation(
   inputDeviceIndex?: number,
   outputDeviceIndex?: number,
-  sourceLang: string = "en-US",
-  targetLang: string = "uk"
+  targetLang: string = "uk",
+  apiKey?: string
 ): Promise<boolean> {
   try {
     const res = await fetch(`${BACKEND_URL}/start`, {
@@ -42,8 +42,8 @@ export async function startTranslation(
       body: JSON.stringify({
         input_device_index: inputDeviceIndex,
         output_device_index: outputDeviceIndex,
-        source_lang: sourceLang,
         target_lang: targetLang,
+        api_key: apiKey || undefined,
       }),
     });
     return res.ok;
@@ -97,12 +97,12 @@ export function subscribeToState(
 
     ws.onclose = () => {
       if (!isClosedManually) {
-        setTimeout(connect, 1000); // Reconnect loop
+        setTimeout(connect, 1000);
       }
     };
 
     ws.onerror = (err) => {
-      console.warn("WebSocket connection error:", err);
+      console.warn("WebSocket error:", err);
       ws?.close();
     };
   };

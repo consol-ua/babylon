@@ -1,195 +1,160 @@
+import os
 import asyncio
 import numpy as np
-import torch
-from typing import AsyncGenerator, Callable, Optional, Dict, Any
-
-# Google Cloud SDK Imports
-try:
-    from google.cloud import speech_v1 as speech
-    from google.cloud import translate_v2 as translate
-except ImportError:
-    speech = None
-    translate = None
-
-# Coqui TTS Imports
-try:
-    from TTS.api import TTS
-except ImportError:
-    TTS = None
+from typing import Callable, Optional
+from google import genai
+from google.genai import types
 
 
-class AIPipeline:
-    """Orchestrates Streaming STT, Machine Translation, and XTTS synthesis with MPS support."""
+class GeminiLiveAudioPipeline:
+    """End-to-End Real-Time Translation and Voiceover using Gemini 3.5 Live Translate."""
 
     def __init__(
         self,
-        source_lang: str = "en-US",
+        api_key: Optional[str] = None,
         target_lang: str = "uk",
         sample_rate: int = 16000,
-        speaker_wav_path: Optional[str] = None,
     ) -> None:
-        self.source_lang = source_lang
+        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.target_lang = target_lang
         self.sample_rate = sample_rate
-        self.speaker_wav_path = speaker_wav_path
 
-        # Determine Apple Silicon MPS or fallback device
-        self.device = "mps" if torch.backends.mps.is_available() else "cpu"
-        print(f"[AIPipeline] Initialized with PyTorch device: {self.device}")
+        self.client: Optional[genai.Client] = None
+        if self.api_key:
+            self.client = genai.Client(api_key=self.api_key)
 
-        # State and callbacks
-        self.is_running = False
+        self.is_running: bool = False
+
+        # Callbacks for telemetry and UI updates
         self.on_stt_result: Optional[Callable[[str, bool], None]] = None
         self.on_translated_result: Optional[Callable[[str], None]] = None
 
-        # Google Cloud Clients
-        self.speech_client = speech.SpeechClient() if speech else None
-        self.translate_client = translate.Client() if translate else None
-
-        # TTS Model initialization
-        self.tts_model: Optional[Any] = None
-
-    def initialize_tts(self) -> None:
-        """Loads Coqui XTTS model onto the MPS device."""
-        if TTS is not None and self.tts_model is None:
-            try:
-                print("[AIPipeline] Loading XTTSv2 model onto device...")
-                self.tts_model = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(
-                    self.device
-                )
-                print("[AIPipeline] XTTSv2 loaded successfully.")
-            except Exception as e:
-                print(f"[AIPipeline Error loading XTTS] {e}")
-
-    async def translate_text(self, text: str) -> str:
-        """Translate source text to target language."""
-        if not text.strip():
-            return ""
-
-        if self.translate_client:
-            loop = asyncio.get_running_loop()
-            result: Dict[str, Any] = await loop.run_in_executor(
-                None,
-                lambda: self.translate_client.translate(
-                    text, target_language=self.target_lang
-                ),
-            )
-            return str(result.get("translatedText", ""))
-        
-        # Fallback/Mock for local testing without credentials
-        return f"[Translated ({self.target_lang})]: {text}"
-
-    async def synthesize_speech(self, text: str) -> np.ndarray:
-        """Synthesizes text using XTTS and yields raw audio buffer (np.int16)."""
-        if not text.strip():
-            return np.array([], dtype=np.int16)
-
-        loop = asyncio.get_running_loop()
-
-        def _generate() -> np.ndarray:
-            if self.tts_model and self.speaker_wav_path:
-                # Generate cloned speech using reference audio
-                wav_floats = self.tts_model.tts(
-                    text=text,
-                    speaker_wav=self.speaker_wav_path,
-                    language=self.target_lang,
-                )
-                # Convert float32 [-1.0, 1.0] to int16 [-32768, 32767]
-                wav_int16 = (np.array(wav_floats) * 32767).astype(np.int16)
-                return wav_int16
-            else:
-                # Mock synthetic tone for testing pipeline flow
-                duration = max(0.5, len(text) * 0.05)
-                t = np.linspace(0, duration, int(self.sample_rate * duration), False)
-                tone = np.sin(2 * np.pi * 440 * t) * 0.5
-                return (tone * 32767).astype(np.int16)
-
-        return await loop.run_in_executor(None, _generate)
-
-    async def _audio_generator(
-        self, input_queue: asyncio.Queue[bytes]
-    ) -> AsyncGenerator[speech.StreamingRecognizeRequest, None]:
-        """Yields audio chunks from the input queue into the Google STT stream."""
-        while self.is_running:
-            chunk = await input_queue.get()
-            if chunk is None:
-                return
-            yield speech.StreamingRecognizeRequest(audio_content=chunk)
+    def set_api_key(self, api_key: str) -> None:
+        """Update Gemini API Key dynamically."""
+        self.api_key = api_key
+        self.client = genai.Client(api_key=self.api_key)
 
     async def run(
         self,
         input_queue: asyncio.Queue[bytes],
         tts_playback_queue: asyncio.Queue[np.ndarray],
     ) -> None:
-        """Main pipeline loop: Streaming STT -> Translate -> XTTS -> Playback Queue."""
+        """Runs bidirectional streaming audio translation session with Gemini Live API."""
         self.is_running = True
-        self.initialize_tts()
 
-        while self.is_running:
-            try:
-                # If Google STT client is available
-                if self.speech_client:
-                    config = speech.RecognitionConfig(
-                        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                        sample_rate_hertz=self.sample_rate,
-                        language_code=self.source_lang,
-                        enable_automatic_punctuation=True,
-                    )
-                    streaming_config = speech.StreamingRecognitionConfig(
-                        config=config, interim_results=True
-                    )
+        if not self.client:
+            print("[GeminiLiveAudioPipeline] Warning: No GEMINI_API_KEY provided. Running in simulation mode.")
+            await self._run_simulation(input_queue, tts_playback_queue)
+            return
 
-                    requests_gen = self._audio_generator(input_queue)
-                    responses = self.speech_client.streaming_recognize(
-                        config=streaming_config, requests=requests_gen
-                    )
+        config = types.LiveConnectConfig(
+            response_modalities=[types.Modality.AUDIO],
+            translation_config=types.TranslationConfig(
+                target_language_code=self.target_lang,
+                echo_target_language=True,
+            ),
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+        )
 
-                    for response in responses:
+        try:
+            print(f"[GeminiLiveAudioPipeline] Connecting to gemini-3.5-live-translate-preview (target: {self.target_lang})...")
+            async with self.client.aio.live.connect(
+                model="gemini-3.5-live-translate-preview",
+                config=config,
+            ) as session:
+                print("[GeminiLiveAudioPipeline] Live session connected.")
+
+                async def send_audio_worker() -> None:
+                    """Continuously stream microphone/system audio chunks to Gemini."""
+                    while self.is_running:
+                        try:
+                            chunk = await input_queue.get()
+                            if chunk is None:
+                                break
+                            await session.send_realtime_input(
+                                audio=types.Blob(
+                                    data=chunk,
+                                    mime_type=f"audio/pcm;rate={self.sample_rate}",
+                                )
+                            )
+                        except Exception as e:
+                            print(f"[Gemini Sender Error] {e}")
+                            break
+
+                async def receive_audio_worker() -> None:
+                    """Receive real-time translated audio chunks and transcriptions from Gemini."""
+                    async for response in session.receive():
                         if not self.is_running:
                             break
 
-                        for result in response.results:
-                            transcript = result.alternatives[0].transcript
-                            is_final = result.is_final
+                        content = response.server_content
+                        if not content:
+                            continue
 
+                        # Process received translated audio PCM (24kHz little-endian 16-bit mono)
+                        if content.model_turn:
+                            for part in content.model_turn.parts:
+                                if part.inline_data and part.inline_data.data:
+                                    raw_pcm_24k = part.inline_data.data
+                                    # Convert raw 24kHz PCM to numpy array
+                                    audio_24k = np.frombuffer(raw_pcm_24k, dtype=np.int16)
+                                    
+                                    # Resample 24kHz down to 16kHz to match engine
+                                    if len(audio_24k) > 0:
+                                        num_samples_16k = int(len(audio_24k) * (16000 / 24000))
+                                        orig_indices = np.linspace(0, len(audio_24k) - 1, len(audio_24k))
+                                        new_indices = np.linspace(0, len(audio_24k) - 1, num_samples_16k)
+                                        audio_16k = np.interp(new_indices, orig_indices, audio_24k).astype(np.int16)
+                                        
+                                        await tts_playback_queue.put(audio_16k)
+
+                        # User input transcription (Source text)
+                        if content.input_transcription and content.input_transcription.text:
                             if self.on_stt_result:
-                                self.on_stt_result(transcript, is_final)
+                                self.on_stt_result(content.input_transcription.text, True)
 
-                            if is_final:
-                                # 1. Translate
-                                translated_text = await self.translate_text(transcript)
-                                if self.on_translated_result:
-                                    self.on_translated_result(translated_text)
+                        # Output translation transcription (Target text)
+                        if content.output_transcription and content.output_transcription.text:
+                            if self.on_translated_result:
+                                self.on_translated_result(content.output_transcription.text)
 
-                                # 2. Synthesize via XTTS
-                                audio_waveform = await self.synthesize_speech(translated_text)
+                        # Interruption handling
+                        if content.interrupted:
+                            # Clear any buffered playback audio on user interruption
+                            while not tts_playback_queue.empty():
+                                try:
+                                    tts_playback_queue.get_nowait()
+                                except asyncio.QueueEmpty:
+                                    break
 
-                                # 3. Enqueue to Audio Engine for playback & ducking
-                                chunk_size = 1024
-                                for i in range(0, len(audio_waveform), chunk_size):
-                                    chunk = audio_waveform[i : i + chunk_size]
-                                    await tts_playback_queue.put(chunk)
-                else:
-                    # Simulated STT loop for development/testing without cloud keys
-                    await asyncio.sleep(2.0)
-                    if not input_queue.empty():
-                        await input_queue.get()
-                        demo_transcript = "This is a real-time translation demonstration."
-                        if self.on_stt_result:
-                            self.on_stt_result(demo_transcript, True)
-                        
-                        translated_text = await self.translate_text(demo_transcript)
-                        if self.on_translated_result:
-                            self.on_translated_result(translated_text)
+                await asyncio.gather(send_audio_worker(), receive_audio_worker())
 
-                        synth_audio = await self.synthesize_speech(translated_text)
-                        for i in range(0, len(synth_audio), 1024):
-                            await tts_playback_queue.put(synth_audio[i : i + 1024])
+        except Exception as e:
+            print(f"[GeminiLiveAudioPipeline Session Error] {e}")
+        finally:
+            self.is_running = False
 
-            except Exception as e:
-                print(f"[AIPipeline Loop Error] {e}")
-                await asyncio.sleep(1.0)
+    async def _run_simulation(
+        self,
+        input_queue: asyncio.Queue[bytes],
+        tts_playback_queue: asyncio.Queue[np.ndarray],
+    ) -> None:
+        """Simulate translation stream when no API key is provided."""
+        while self.is_running:
+            await asyncio.sleep(2.0)
+            if not input_queue.empty():
+                await input_queue.get()
+                if self.on_stt_result:
+                    self.on_stt_result("Live speech detected in system audio stream.", True)
+                if self.on_translated_result:
+                    self.on_translated_result(f"Живе мовлення виявлено в аудіопотоці ({self.target_lang}).")
+
+                # Generate brief synthetic confirmation tone
+                t = np.linspace(0, 0.4, int(self.sample_rate * 0.4), False)
+                tone = (np.sin(2 * np.pi * 520 * t) * 0.3 * 32767).astype(np.int16)
+                await tts_playback_queue.put(tone)
 
     def stop(self) -> None:
-        """Stop the AI processing pipeline."""
+        """Stops the live translation session."""
         self.is_running = False
