@@ -1,6 +1,16 @@
 import os
 import asyncio
+from pathlib import Path
 from typing import Optional, Set
+from dotenv import load_dotenv
+
+# Load .env file from backend or root directory
+env_path = Path(__file__).parent / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    load_dotenv()
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,7 +18,23 @@ from pydantic import BaseModel
 from audio_engine import AudioEngine
 from ai_pipeline import GeminiLiveAudioPipeline
 
-app = FastAPI(title="macOS Gemini Live Voiceover Backend")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    broadcast_task = asyncio.create_task(state_broadcast_loop())
+    try:
+        yield
+    finally:
+        broadcast_task.cancel()
+        try:
+            await broadcast_task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(
+    title="macOS Gemini Live Voiceover Backend",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -94,10 +120,6 @@ async def state_broadcast_loop() -> None:
                 }
             )
         await asyncio.sleep(0.05)
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    asyncio.create_task(state_broadcast_loop())
 
 @app.get("/devices")
 def get_devices():

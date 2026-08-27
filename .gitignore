@@ -9,3 +9,5 @@ backend/build
 *.pyc
 .DS_Store
 .env
+
+.agents/
