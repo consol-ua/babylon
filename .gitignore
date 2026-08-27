@@ -1,0 +1,8 @@
+# IDE - VSCode
+.vscode/
+
+# local env files
+.env
+.env*.local
+
+.agents/
