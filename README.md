@@ -1,137 +1,143 @@
-# macOS Real-Time Translation & Voiceover Desktop
+# Gemini Live Duo Translator (macOS Desktop)
 
-A real-time audio translation and voiceover desktop application for macOS built with **Tauri 2.0**, **React 18 (TypeScript + Tailwind CSS)**, **Python 3.11+**, and **Gemini 3.5 Live Translate (`gemini-3.5-live-translate-preview`)**.
-
----
-
-## Features
-- **Bidirectional Streaming Translation**: Real-time speech-to-speech translation using the Gemini Live API over WebSockets.
-- **Sidechain Audio Ducking**: Dynamically attenuates original background / system audio while the translated voiceover is playing.
-- **macOS System Audio Capture**: Seamless integration with microphone input or [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) virtual audio cable.
-- **Live Telemetry & Transcripts**: High-frequency (20 FPS) WebSocket updates for audio VU meters, ducking indicators, and synchronized live transcripts.
+Двосторонній синхронний AI-перекладач у реальному часі для онлайн-дзвінків (**Zoom**, **Google Meet**, **Microsoft Teams**) та перегляду відео (**YouTube**). Побудований на базі **Tauri 2.0**, **React 18 (TypeScript + Tailwind CSS)**, **FastAPI (Python 3.11+)** та **Gemini 3.5 Live Translate (`gemini-3.5-live-translate-preview`)**.
 
 ---
 
-## Architecture Overview
+## 🌟 Основні можливості
+
+- **Повний дуплекс для дзвінків (Full Duplex Live Calls)**:
+  - **Мій голос (UA → Обрана мова)**: Захоплює ваш голос із мікрофона, синхронно перекладає на мову співрозмовника та транслює **чистий синтезований AI-голос** у віртуальний мікрофон для Zoom/Google Meet.
+  - **Звук дзвінка (Обрана мова → UA)**: Захоплює звук співрозмовника, перекладає українською, приглушує оригінал (Sidechain Audio Ducking) та виводить у ваші навушники.
+- **Вкладка тестування (Demo Playground)**:
+  - 3 вбудовані 16kHz WAV-записи англійською мовою (*IT Daily Standup*, *System Architecture Interview*, *Casual Small Talk*) для миттєвої перевірки розпізнавання, перекладу та синтезу без налаштування віртуальних кабелів чи дзвінків.
+- **Спрощений вибір мови**:
+  - Єдиний селектор «Мова співрозмовника» (English, German, Polish, Spanish, French, Italian, Japanese, Chinese). Ваша мова завжди Українська.
+- **Жива телеметрія (20 FPS WebSocket)**:
+  - VU-індикатори рівнів гучності, статус Ducking та синхронні двомовні текстові транскрипти.
+
+---
+
+## 🏗️ Архітектура системи
 
 ```text
 myProject/
-├── src-tauri/                 # Native macOS window & Tauri 2.0 configuration
-├── src/                       # React 18 frontend with TypeScript & Tailwind CSS
-├── backend/                   # Python FastAPI sidecar (audio routing & Gemini Live stream)
-│   ├── audio_engine.py        # PyAudio DSP, buffer mixing, sidechain ducking
-│   ├── ai_pipeline.py         # Bidirectional Gemini 3.5 Live streaming
-│   ├── main.py                # FastAPI HTTP + WebSocket endpoints
-│   ├── requirements.txt       # Python dependencies
-│   └── .env                   # Configuration (GEMINI_API_KEY)
-└── package.json               # Node.js dependencies & scripts
+├── src-tauri/                 # Tauri 2.0 (Rust нативна обгортка для macOS)
+├── src/                       # React 18 UI (TypeScript, Tailwind CSS, Lucide)
+│   ├── components/            # Модульні компоненти (CallView, TestingView, VuMeter, TranscriptBox)
+│   ├── App.tsx                # Головний компонент із вкладками дзвінка та тестування
+│   └── api.ts                 # HTTP та WebSocket клієнт до бекенду
+├── backend/                   # Python FastAPI Sidecar
+│   ├── audio_engine.py        # DualChannelAudioEngine (PyAudio, дуплексні потоки, Ducking)
+│   ├── ai_pipeline.py         # GeminiLiveAudioSession (Gemini 3.5 Live Translate)
+│   ├── main.py                # FastAPI HTTP + WebSocket роути
+│   ├── samples/               # Вбудовані тестові WAV-файли (16kHz mono)
+│   └── requirements.txt       # Python залежності
+└── package.json               # Node.js конфігурація
 ```
 
 ---
 
-## Prerequisites (macOS)
+## 📋 Системні вимоги (macOS)
 
-1. **PortAudio** (required for `pyaudio`):
+1. **PortAudio** (необхідний для `pyaudio`):
    ```bash
    brew install portaudio
    ```
-2. **Node.js** (v18+) & **npm**
-3. **Python** (3.11+)
-4. **Rust & Cargo** (for Tauri native desktop builds):
+2. **Node.js** (v18+) та **npm**
+3. **Python** (3.11 або новіший)
+4. **Rust & Cargo** (для збірки нативного застосунку Tauri):
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
-5. *(Optional)* **BlackHole 2ch Virtual Audio Driver** (to capture system/app audio directly):
+5. **BlackHole 2ch Virtual Audio Driver** (для перехоплення звуку із Zoom/Meet/YouTube):
    ```bash
    brew install blackhole-2ch
    ```
 
 ---
 
-## Quick Start / Development Setup
+## 🚀 Покрокова інструкція із запуску
 
-### 1. Configure Environment Variables
-Create or edit `backend/.env`:
+### Крок 1: Клонування та налаштування оточення
+
+Перейдіть у кореневу директорію проєкту та налаштуйте API ключ Gemini:
 ```bash
-cp backend/.env.example backend/.env
-```
-Open `backend/.env` and add your Gemini API Key:
-```env
-GEMINI_API_KEY=your_actual_gemini_api_key
+# Скопіюйте приклад .env у папку backend (або введіть ключ безпосередньо в UI)
+echo "GEMINI_API_KEY=ваш_ключ_gemini" > backend/.env
 ```
 
 ---
 
-### 2. Run Python Backend Daemon
+### Крок 2: Запуск Python бекенду
 
-In your first terminal window:
+У **першому терміналі**:
 ```bash
-# Navigate to backend directory
 cd backend
 
-# Create and activate Python virtual environment
+# Створення та активація віртуального оточення
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+# Встановлення залежностей
 pip install -r requirements.txt
 
-# Start the FastAPI server on port 8000
+# Запуск сервера FastAPI (порт 8000)
 python main.py
 ```
-> The backend will be available at `http://127.0.0.1:8000` with WebSocket telemetry at `ws://127.0.0.1:8000/ws`.
+> Бекенд запуститься на `http://127.0.0.1:8000` з WebSocket за адресою `ws://127.0.0.1:8000/ws`.
 
 ---
 
-### 3. Run Frontend / Tauri Application
+### Крок 3: Запуск графічного інтерфейсу (Frontend / Tauri)
 
-In a second terminal window (at project root):
+У **другому терміналі** (з кореневої папки проєкту):
 ```bash
-# Install Node dependencies
+# Встановлення Node-пакетів
 npm install
 
-# Option A: Run in Browser Mode (Fast UI Iteration)
+# Варіант A: Запуск у браузері (швидкий режим розробки)
 npm run dev
-# Open http://localhost:1420
+# Відкрийте браузер за адресою: http://localhost:1420
 
-# Option B: Run as Native macOS Desktop Window (Tauri)
+# Варіант B: Запуск як нативного macOS вікна (Tauri)
 npm run tauri dev
 ```
 
 ---
 
-## Audio Ducking & Routing Guide
+## 🎧 Інструкція з використання
 
-1. **Capture System Audio**: In macOS *System Settings > Sound*, or inside apps (Zoom, Discord, Chrome), set output to **BlackHole 2ch**.
-2. **Configure App**:
-   - **Input Device**: Select `BlackHole 2ch` (or your Microphone).
-   - **Output Device**: Select your Speakers or Headphones.
-   - **Ducking Level**: Adjust the slider (e.g. `20%`) to set background volume while translation is active.
-   - **Target Language**: Choose target translation language.
-   - Click **Start Gemini Live Translate**.
+### 1. Вкладка «Тестування записів (Demo Playground)»
+1. Перейдіть на вкладку **«Тестування записів»**.
+2. Оберіть один із трьох готових аудіозаписів:
+   - **IT Daily Standup** (статус розробки, мікросервіси, WebSockets).
+   - **System Architecture Interview** (розподілені потоки, гео-відмовостійкість).
+   - **Casual Small Talk** (плани на вихідні, розмова про погоду).
+3. Виберіть ваші навушники у полі **Пристрій виводу**.
+4. Натисніть **«Запустити тест обраного запису»** — ви почуєте оригінальну англійську доріжку, приглушену (Ducking), та чистий синхронний переклад українською мовою.
 
-  ## програма підтримує переклад та озвучення відео з YouTube у реальному часі.
+---
 
-  Для цього застосовується перехоплення системного аудіопотоку через віртуальний
-  аудіодрайвер та стримінг у Gemini Live API.
-  ──────
-  ### Як налаштувати для YouTube:
+### 2. Вкладка «Синхронний дзвінок (Zoom / Google Meet)»
+1. **Налаштування Zoom / Google Meet**:
+   - **Мікрофон у Zoom/Meet**: виберіть **BlackHole 2ch**.
+   - **Динаміки/Вихід у Zoom/Meet**: виберіть **BlackHole 2ch** (або окремий віртуальний кабель).
+2. **Налаштування в застосунку**:
+   - **Мій мікрофон**: оберіть ваш фізичний мікрофон (MacBook Mic, AirPods тощо).
+   - **Віртуальний мікрофон для Zoom**: оберіть `BlackHole 2ch`.
+   - **Вхід звуку із Zoom/Meet**: оберіть `BlackHole 2ch`.
+   - **Мої навушники**: оберіть ваші фізичні навушники або динаміки.
+   - **Мова співрозмовника**: оберіть мову (за замовчуванням Англійська).
+3. Натисніть **«Запустити синхронний переклад дзвінка (Full Duplex)»**.
+4. Коли ви говорите українською — у Zoom транслюється англійський AI-голос. Коли співрозмовник відповідає англійською — ви чуєте український переклад у своїх навушниках.
 
-  1. Встановіть віртуальний аудіокабель (якщо ще не встановлено):
-    brew install blackhole-2ch
+---
 
-  2. Маршрутизація звуку в macOS:
-      • У системних налаштуваннях звуку macOS (System Settings → Sound) або в
-      налаштуваннях браузера встановіть вихідний пристрій (Output): BlackHole 2ch.
-  3. Конфігурація в додатку:
-      • Input Device: виберіть BlackHole 2ch (куди надходить звук з YouTube).
-      • Output Device: виберіть ваші навушники або динаміки.
-      • Target Language: оберіть цільову мову перекладу (наприклад, Ukrainian).
-      • Ducking Level: відрегулюйте рівень гучності оригінального відео під час
-      озвучення (рекомендовано 15% - 25%).
-  4. Натисніть Start Gemini Live Translate і запустіть відео на YouTube.
-
-  │ Як це працює: Додаток захоплює оригінальний звук з YouTube через BlackHole
-  │ https://github.com/ExistentialAudio/BlackHole, передає потік у Gemini Live API,
-  │ генерує голосовий переклад у реальному часі та автоматично приглушує (sidechain
-  │ ducking) оригінальну доріжку під час відтворення дубляжу.
+### 3. Переклад відео з YouTube
+1. У системних налаштуваннях macOS (*System Settings → Sound → Output*) встановіть **BlackHole 2ch**.
+2. У застосунку на вкладці **«Синхронний дзвінок»** у блоці **Звук співрозмовника**:
+   - **Вхід звуку**: `BlackHole 2ch`.
+   - **Мої навушники**: ваші навушники.
+   - **Ducking**: встановіть рівень фону (15% – 25%).
+3. Запустіть трансляцію та насолоджуйтесь українською озвучкою з приглушенням оригіналу.
