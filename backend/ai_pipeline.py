@@ -128,7 +128,24 @@ class GeminiLiveAudioPipeline:
                                 except asyncio.QueueEmpty:
                                     break
 
-                await asyncio.gather(send_audio_worker(), receive_audio_worker())
+                send_task = asyncio.create_task(send_audio_worker())
+                recv_task = asyncio.create_task(receive_audio_worker())
+
+                done, pending = await asyncio.wait(
+                    [send_task, recv_task],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                for task in pending:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+
+                for task in done:
+                    if task.exception() and not isinstance(task.exception(), asyncio.CancelledError):
+                        print(f"[GeminiLiveAudioPipeline Worker Error] {task.exception()}")
 
         except Exception as e:
             print(f"[GeminiLiveAudioPipeline Session Error] {e}")

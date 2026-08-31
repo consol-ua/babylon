@@ -4,5 +4,6 @@ pyaudio>=0.2.14
 numpy>=1.26.0
 google-genai>=1.0.0
 websockets>=12.0
-pydantic>=2.6.0
+pydantic>=2.12.5,<2.13.0
 python-dotenv>=1.0.0
+

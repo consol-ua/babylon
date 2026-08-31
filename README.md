@@ -109,3 +109,29 @@ npm run tauri dev
    - **Ducking Level**: Adjust the slider (e.g. `20%`) to set background volume while translation is active.
    - **Target Language**: Choose target translation language.
    - Click **Start Gemini Live Translate**.
+
+  ## програма підтримує переклад та озвучення відео з YouTube у реальному часі.
+
+  Для цього застосовується перехоплення системного аудіопотоку через віртуальний
+  аудіодрайвер та стримінг у Gemini Live API.
+  ──────
+  ### Як налаштувати для YouTube:
+
+  1. Встановіть віртуальний аудіокабель (якщо ще не встановлено):
+    brew install blackhole-2ch
+
+  2. Маршрутизація звуку в macOS:
+      • У системних налаштуваннях звуку macOS (System Settings → Sound) або в
+      налаштуваннях браузера встановіть вихідний пристрій (Output): BlackHole 2ch.
+  3. Конфігурація в додатку:
+      • Input Device: виберіть BlackHole 2ch (куди надходить звук з YouTube).
+      • Output Device: виберіть ваші навушники або динаміки.
+      • Target Language: оберіть цільову мову перекладу (наприклад, Ukrainian).
+      • Ducking Level: відрегулюйте рівень гучності оригінального відео під час
+      озвучення (рекомендовано 15% - 25%).
+  4. Натисніть Start Gemini Live Translate і запустіть відео на YouTube.
+
+  │ Як це працює: Додаток захоплює оригінальний звук з YouTube через BlackHole
+  │ https://github.com/ExistentialAudio/BlackHole, передає потік у Gemini Live API,
+  │ генерує голосовий переклад у реальному часі та автоматично приглушує (sidechain
+  │ ducking) оригінальну доріжку під час відтворення дубляжу.
