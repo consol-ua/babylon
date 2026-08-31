@@ -2,7 +2,16 @@ import React from "react";
 import { AudioDevice, DualBackendState } from "../api";
 import { VuMeter } from "./VuMeter";
 import { TranscriptBox } from "./TranscriptBox";
-import { Mic, Volume2, VolumeX, Play, Square, ArrowRight, PhoneForwarded } from "lucide-react";
+import {
+  Mic,
+  Volume2,
+  VolumeX,
+  Play,
+  Square,
+  ArrowRight,
+  PhoneForwarded,
+  Sliders,
+} from "lucide-react";
 
 interface CallViewProps {
   devices: AudioDevice[];
@@ -17,6 +26,8 @@ interface CallViewProps {
   partnerLangLabel: string;
   duckingFactor: number;
   onDuckingChange: (factor: number) => void;
+  jitterBufferMs: number;
+  onJitterBufferChange: (ms: number) => void;
   state: DualBackendState;
   isLoading: boolean;
   onToggleCall: () => void;
@@ -35,6 +46,8 @@ export const CallView: React.FC<CallViewProps> = ({
   partnerLangLabel,
   duckingFactor,
   onDuckingChange,
+  jitterBufferMs,
+  onJitterBufferChange,
   state,
   isLoading,
   onToggleCall,
@@ -199,26 +212,51 @@ export const CallView: React.FC<CallViewProps> = ({
               </select>
             </div>
 
-            {/* Ducking Slider */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between items-center">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <VolumeX className="w-3.5 h-3.5 text-emerald-400" />
-                  Приглушення оригінального голосу (Ducking)
-                </label>
-                <span className="text-xs font-mono font-semibold text-emerald-400">
-                  {Math.round(duckingFactor * 100)}%
-                </span>
+            {/* DSP Controls: Ducking & Jitter Buffer */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-800">
+              {/* Ducking Slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-medium text-slate-300 flex items-center gap-1">
+                    <VolumeX className="w-3 h-3 text-emerald-400" />
+                    Приглушення (Ducking)
+                  </label>
+                  <span className="text-[11px] font-mono font-semibold text-emerald-400">
+                    {Math.round(duckingFactor * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.0"
+                  max="1.0"
+                  step="0.05"
+                  value={duckingFactor}
+                  onChange={(e) => onDuckingChange(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
               </div>
-              <input
-                type="range"
-                min="0.0"
-                max="1.0"
-                step="0.05"
-                value={duckingFactor}
-                onChange={(e) => onDuckingChange(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
+
+              {/* Jitter Buffer Slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-medium text-slate-300 flex items-center gap-1">
+                    <Sliders className="w-3 h-3 text-indigo-400" />
+                    Згладжування (Jitter Buffer)
+                  </label>
+                  <span className="text-[11px] font-mono font-semibold text-indigo-400">
+                    {jitterBufferMs} мс
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="50"
+                  max="400"
+                  step="25"
+                  value={jitterBufferMs}
+                  onChange={(e) => onJitterBufferChange(parseInt(e.target.value, 10))}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+              </div>
             </div>
 
             <VuMeter

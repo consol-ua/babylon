@@ -7,6 +7,7 @@ import {
   startSampleTest,
   stopSampleTest,
   updateDuckingFactor,
+  updateJitterBuffer,
   subscribeToState,
   AudioDevice,
   SampleInfo,
@@ -14,6 +15,7 @@ import {
 } from "./api";
 import { CallView } from "./components/CallView";
 import { TestingView } from "./components/TestingView";
+import { LogConsole } from "./components/LogConsole";
 import {
   Radio,
   PhoneCall,
@@ -57,8 +59,9 @@ export const App: React.FC = () => {
   const [callInputIndex, setCallInputIndex] = useState<number | undefined>();
   const [headphonesIndex, setHeadphonesIndex] = useState<number | undefined>();
 
-  // Ducking Factor
+  // DSP & Buffering
   const [duckingFactor, setDuckingFactor] = useState<number>(0.2);
+  const [jitterBufferMs, setJitterBufferMs] = useState<number>(150);
 
   // Backend Live State
   const [backendState, setBackendState] = useState<DualBackendState>({
@@ -66,6 +69,9 @@ export const App: React.FC = () => {
     is_testing_active: false,
     active_sample_id: null,
     partner_lang: "en",
+    jitter_buffer_ms: 150,
+    last_error: null,
+    logs: [],
     outgoing: { stt_text: "", translated_text: "", volume_db: -100 },
     incoming: { stt_text: "", translated_text: "", volume_db: -100, is_ducking: false },
   });
@@ -96,6 +102,9 @@ export const App: React.FC = () => {
 
     const unsubscribe = subscribeToState((newState) => {
       setBackendState(newState);
+      if (newState.jitter_buffer_ms && newState.jitter_buffer_ms !== jitterBufferMs) {
+        setJitterBufferMs(newState.jitter_buffer_ms);
+      }
     });
 
     return () => {
@@ -113,6 +122,11 @@ export const App: React.FC = () => {
     await updateDuckingFactor(val);
   }, []);
 
+  const handleJitterBufferChange = useCallback(async (val: number) => {
+    setJitterBufferMs(val);
+    await updateJitterBuffer(val);
+  }, []);
+
   const handleToggleCall = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -126,6 +140,7 @@ export const App: React.FC = () => {
           headphones_index: headphonesIndex,
           partner_lang: partnerLang,
           ducking_factor: duckingFactor,
+          jitter_buffer_ms: jitterBufferMs,
           api_key: apiKey || undefined,
         });
       }
@@ -142,6 +157,7 @@ export const App: React.FC = () => {
     headphonesIndex,
     partnerLang,
     duckingFactor,
+    jitterBufferMs,
     apiKey,
   ]);
 
@@ -156,6 +172,7 @@ export const App: React.FC = () => {
           headphones_index: headphonesIndex,
           partner_lang: partnerLang,
           ducking_factor: duckingFactor,
+          jitter_buffer_ms: jitterBufferMs,
           api_key: apiKey || undefined,
         });
       }
@@ -170,6 +187,7 @@ export const App: React.FC = () => {
     headphonesIndex,
     partnerLang,
     duckingFactor,
+    jitterBufferMs,
     apiKey,
   ]);
 
@@ -292,7 +310,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* Main Tab Content */}
-      <main className="flex-1">
+      <main className="space-y-6">
         {activeTab === "call" ? (
           <CallView
             devices={devices}
@@ -307,6 +325,8 @@ export const App: React.FC = () => {
             partnerLangLabel={partnerLangOption.label}
             duckingFactor={duckingFactor}
             onDuckingChange={handleDuckingChange}
+            jitterBufferMs={jitterBufferMs}
+            onJitterBufferChange={handleJitterBufferChange}
             state={backendState}
             isLoading={isLoading}
             onToggleCall={handleToggleCall}
@@ -322,11 +342,19 @@ export const App: React.FC = () => {
             partnerLangLabel={partnerLangOption.label}
             duckingFactor={duckingFactor}
             onDuckingChange={handleDuckingChange}
+            jitterBufferMs={jitterBufferMs}
+            onJitterBufferChange={handleJitterBufferChange}
             state={backendState}
             isLoading={isLoading}
             onToggleTest={handleToggleTest}
           />
         )}
+
+        {/* Global Log & Diagnostic Console */}
+        <LogConsole
+          logs={backendState.logs}
+          lastError={backendState.last_error}
+        />
       </main>
     </div>
   );

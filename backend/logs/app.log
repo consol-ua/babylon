@@ -1,0 +1,55 @@
+[2026-08-31 22:49:46,108] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 22:49:46,270] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 22:49:46,270] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 22:50:44,500] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 22:50:44,644] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 250 мс.
+[2026-08-31 22:55:10,575] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 150мс, ducking: 20%).
+[2026-08-31 22:55:10,575] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 150мс, ducking: 20%).
+[2026-08-31 22:55:12,188] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 22:55:12,188] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 22:55:12,194] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено користувачем.
+[2026-08-31 22:55:12,194] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено користувачем.
+[2026-08-31 22:55:18,585] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 150мс, ducking: 20%).
+[2026-08-31 22:55:18,585] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 150мс, ducking: 20%).
+[2026-08-31 22:55:35,841] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено користувачем.
+[2026-08-31 22:55:35,841] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено користувачем.
+[2026-08-31 23:01:51,535] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:01:52,062] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:01:52,236] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:01:52,236] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:02:11,142] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 150мс, ducking: 20%).
+[2026-08-31 23:02:11,142] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 150мс, ducking: 20%).
+[2026-08-31 23:02:36,863] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:02:36,863] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:02:40,410] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 125 мс.
+[2026-08-31 23:02:40,410] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 125 мс.
+[2026-08-31 23:02:40,838] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 100 мс.
+[2026-08-31 23:02:40,838] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 100 мс.
+[2026-08-31 23:02:43,408] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 100мс, ducking: 5%).
+[2026-08-31 23:02:43,408] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 100мс, ducking: 5%).
+[2026-08-31 23:03:08,599] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:03:08,599] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:03:13,034] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 175 мс.
+[2026-08-31 23:03:13,034] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 175 мс.
+[2026-08-31 23:03:13,811] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 225 мс.
+[2026-08-31 23:03:13,811] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 225 мс.
+[2026-08-31 23:03:14,856] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 275 мс.
+[2026-08-31 23:03:14,856] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 275 мс.
+[2026-08-31 23:03:15,915] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 325 мс.
+[2026-08-31 23:03:15,915] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 325 мс.
+[2026-08-31 23:03:16,512] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 300 мс.
+[2026-08-31 23:03:16,512] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 300 мс.
+[2026-08-31 23:03:16,598] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 275 мс.
+[2026-08-31 23:03:16,598] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 275 мс.
+[2026-08-31 23:03:17,267] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 250 мс.
+[2026-08-31 23:03:17,267] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 250 мс.
+[2026-08-31 23:03:17,568] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 225 мс.
+[2026-08-31 23:03:17,568] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 225 мс.
+[2026-08-31 23:03:17,589] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 225 мс.
+[2026-08-31 23:03:17,589] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 225 мс.
+[2026-08-31 23:03:18,485] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 200 мс.
+[2026-08-31 23:03:18,485] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer оновлено: 200 мс.
+[2026-08-31 23:03:19,573] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'System Architecture Interview' (буфер: 200мс, ducking: 5%).
+[2026-08-31 23:03:19,573] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'System Architecture Interview' (буфер: 200мс, ducking: 5%).
+[2026-08-31 23:03:40,765] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено.
+[2026-08-31 23:03:40,765] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено.

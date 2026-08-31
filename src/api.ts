@@ -14,6 +14,13 @@ export interface SampleInfo {
   filename: string;
 }
 
+export interface LogEntry {
+  timestamp: string;
+  level: "INFO" | "WARN" | "ERROR";
+  message: string;
+  source: string;
+}
+
 export interface StreamTelemetry {
   stt_text: string;
   translated_text: string;
@@ -26,6 +33,9 @@ export interface DualBackendState {
   is_testing_active: boolean;
   active_sample_id: string | null;
   partner_lang: string;
+  jitter_buffer_ms: number;
+  last_error: string | null;
+  logs: LogEntry[];
   outgoing: StreamTelemetry;
   incoming: StreamTelemetry;
 }
@@ -37,6 +47,7 @@ export interface CallStartPayload {
   headphones_index?: number;
   partner_lang: string;
   ducking_factor: number;
+  jitter_buffer_ms: number;
   api_key?: string;
 }
 
@@ -44,6 +55,7 @@ export interface SampleStartPayload {
   sample_id: string;
   headphones_index?: number;
   ducking_factor: number;
+  jitter_buffer_ms: number;
   partner_lang: string;
   api_key?: string;
 }
@@ -75,6 +87,18 @@ export async function fetchSamples(): Promise<SampleInfo[]> {
   }
 }
 
+export async function fetchLogs(): Promise<LogEntry[]> {
+  try {
+    const res = await fetch(`${API_BASE}/logs`);
+    if (!res.ok) throw new Error("Failed to fetch logs");
+    const data = await res.json();
+    return data.logs;
+  } catch (err) {
+    console.error("[API] fetchLogs error:", err);
+    return [];
+  }
+}
+
 export async function startCall(payload: CallStartPayload): Promise<void> {
   const res = await fetch(`${API_BASE}/call/start`, {
     method: "POST",
@@ -82,7 +106,8 @@ export async function startCall(payload: CallStartPayload): Promise<void> {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Failed to start call");
+    const errData = await res.json().catch(() => ({ detail: "Failed to start call" }));
+    throw new Error(errData.detail || "Failed to start call");
   }
 }
 
@@ -102,7 +127,8 @@ export async function startSampleTest(payload: SampleStartPayload): Promise<void
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Failed to start sample test");
+    const errData = await res.json().catch(() => ({ detail: "Failed to start sample test" }));
+    throw new Error(errData.detail || "Failed to start sample test");
   }
 }
 
@@ -120,6 +146,14 @@ export async function updateDuckingFactor(ducking_factor: number): Promise<void>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ducking_factor }),
+  });
+}
+
+export async function updateJitterBuffer(jitter_buffer_ms: number): Promise<void> {
+  await fetch(`${API_BASE}/jitter_buffer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jitter_buffer_ms }),
   });
 }
 
