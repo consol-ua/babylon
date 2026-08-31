@@ -6,18 +6,20 @@ from google import genai
 from google.genai import types
 
 
-class GeminiLiveAudioPipeline:
-    """End-to-End Real-Time Translation and Voiceover using Gemini 3.5 Live Translate."""
+class GeminiLiveAudioSession:
+    """Independent Gemini 3.5 Live Streaming Session for a single directional audio channel."""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         target_lang: str = "uk",
         sample_rate: int = 16000,
+        channel_name: str = "channel",
     ) -> None:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.target_lang = target_lang
         self.sample_rate = sample_rate
+        self.channel_name = channel_name
 
         self.client: Optional[genai.Client] = None
         if self.api_key:
@@ -32,7 +34,10 @@ class GeminiLiveAudioPipeline:
     def set_api_key(self, api_key: str) -> None:
         """Update Gemini API Key dynamically."""
         self.api_key = api_key
-        self.client = genai.Client(api_key=self.api_key)
+        if self.api_key:
+            self.client = genai.Client(api_key=self.api_key)
+        else:
+            self.client = None
 
     async def run(
         self,
@@ -43,7 +48,7 @@ class GeminiLiveAudioPipeline:
         self.is_running = True
 
         if not self.client:
-            print("[GeminiLiveAudioPipeline] Warning: No GEMINI_API_KEY provided. Running in simulation mode.")
+            print(f"[GeminiLiveAudioSession:{self.channel_name}] Warning: No GEMINI_API_KEY provided. Running in simulation mode.")
             await self._run_simulation(input_queue, tts_playback_queue)
             return
 
@@ -58,15 +63,15 @@ class GeminiLiveAudioPipeline:
         )
 
         try:
-            print(f"[GeminiLiveAudioPipeline] Connecting to gemini-3.5-live-translate-preview (target: {self.target_lang})...")
+            print(f"[GeminiLiveAudioSession:{self.channel_name}] Connecting to gemini-3.5-live-translate-preview (target: {self.target_lang})...")
             async with self.client.aio.live.connect(
                 model="gemini-3.5-live-translate-preview",
                 config=config,
             ) as session:
-                print("[GeminiLiveAudioPipeline] Live session connected.")
+                print(f"[GeminiLiveAudioSession:{self.channel_name}] Live session connected.")
 
                 async def send_audio_worker() -> None:
-                    """Continuously stream microphone/system audio chunks to Gemini."""
+                    """Continuously stream audio chunks to Gemini."""
                     while self.is_running:
                         try:
                             chunk = await input_queue.get()
@@ -79,7 +84,7 @@ class GeminiLiveAudioPipeline:
                                 )
                             )
                         except Exception as e:
-                            print(f"[Gemini Sender Error] {e}")
+                            print(f"[{self.channel_name} Sender Error] {e}")
                             break
 
                 async def receive_audio_worker() -> None:
@@ -97,10 +102,9 @@ class GeminiLiveAudioPipeline:
                             for part in content.model_turn.parts:
                                 if part.inline_data and part.inline_data.data:
                                     raw_pcm_24k = part.inline_data.data
-                                    # Convert raw 24kHz PCM to numpy array
                                     audio_24k = np.frombuffer(raw_pcm_24k, dtype=np.int16)
                                     
-                                    # Resample 24kHz down to 16kHz to match engine
+                                    # Resample 24kHz down to 16kHz to match audio engine
                                     if len(audio_24k) > 0:
                                         num_samples_16k = int(len(audio_24k) * (16000 / 24000))
                                         orig_indices = np.linspace(0, len(audio_24k) - 1, len(audio_24k))
@@ -121,7 +125,6 @@ class GeminiLiveAudioPipeline:
 
                         # Interruption handling
                         if content.interrupted:
-                            # Clear any buffered playback audio on user interruption
                             while not tts_playback_queue.empty():
                                 try:
                                     tts_playback_queue.get_nowait()
@@ -145,10 +148,10 @@ class GeminiLiveAudioPipeline:
 
                 for task in done:
                     if task.exception() and not isinstance(task.exception(), asyncio.CancelledError):
-                        print(f"[GeminiLiveAudioPipeline Worker Error] {task.exception()}")
+                        print(f"[{self.channel_name} Worker Error] {task.exception()}")
 
         except Exception as e:
-            print(f"[GeminiLiveAudioPipeline Session Error] {e}")
+            print(f"[GeminiLiveAudioSession:{self.channel_name} Error] {e}")
         finally:
             self.is_running = False
 
@@ -158,18 +161,27 @@ class GeminiLiveAudioPipeline:
         tts_playback_queue: asyncio.Queue[np.ndarray],
     ) -> None:
         """Simulate translation stream when no API key is provided."""
+        sim_counter = 0
         while self.is_running:
-            await asyncio.sleep(2.0)
+            await asyncio.sleep(2.5)
             if not input_queue.empty():
                 await input_queue.get()
-                if self.on_stt_result:
-                    self.on_stt_result("Live speech detected in system audio stream.", True)
-                if self.on_translated_result:
-                    self.on_translated_result(f"Живе мовлення виявлено в аудіопотоці ({self.target_lang}).")
+                sim_counter += 1
+                if self.channel_name == "outgoing":
+                    if self.on_stt_result:
+                        self.on_stt_result(f"Я розмовляю українською в мікрофон [репліка {sim_counter}]", True)
+                    if self.on_translated_result:
+                        self.on_translated_result(f"I am speaking English to the call [phrase {sim_counter}] ({self.target_lang})")
+                else:
+                    if self.on_stt_result:
+                        self.on_stt_result(f"Speaking in the meeting stream [phrase {sim_counter}]", True)
+                    if self.on_translated_result:
+                        self.on_translated_result(f"Співрозмовник говорить у мітингу [фраза {sim_counter}] (переклад українською)")
 
-                # Generate brief synthetic confirmation tone
+                # Generate synthetic test tone (440Hz/520Hz)
+                freq = 440 if self.channel_name == "outgoing" else 520
                 t = np.linspace(0, 0.4, int(self.sample_rate * 0.4), False)
-                tone = (np.sin(2 * np.pi * 520 * t) * 0.3 * 32767).astype(np.int16)
+                tone = (np.sin(2 * np.pi * freq * t) * 0.25 * 32767).astype(np.int16)
                 await tts_playback_queue.put(tone)
 
     def stop(self) -> None:
