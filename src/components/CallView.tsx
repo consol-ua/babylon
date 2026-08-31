@@ -1,5 +1,5 @@
 import React from "react";
-import { AudioDevice, DualBackendState } from "../api";
+import { AudioDevice, DualBackendState, GeminiVoice } from "../api";
 import { VuMeter } from "./VuMeter";
 import { TranscriptBox } from "./TranscriptBox";
 import {
@@ -11,10 +11,12 @@ import {
   ArrowRight,
   PhoneForwarded,
   Sliders,
+  Sparkles,
 } from "lucide-react";
 
 interface CallViewProps {
   devices: AudioDevice[];
+  voices: GeminiVoice[];
   myMicIndex?: number;
   onSelectMyMic: (index: number) => void;
   callVirtualMicIndex?: number;
@@ -24,6 +26,10 @@ interface CallViewProps {
   headphonesIndex?: number;
   onSelectHeadphones: (index: number) => void;
   partnerLangLabel: string;
+  outgoingVoice: string;
+  onSelectOutgoingVoice: (voice: string) => void;
+  incomingVoice: string;
+  onSelectIncomingVoice: (voice: string) => void;
   duckingFactor: number;
   onDuckingChange: (factor: number) => void;
   jitterBufferMs: number;
@@ -35,6 +41,7 @@ interface CallViewProps {
 
 export const CallView: React.FC<CallViewProps> = ({
   devices,
+  voices,
   myMicIndex,
   onSelectMyMic,
   callVirtualMicIndex,
@@ -44,6 +51,10 @@ export const CallView: React.FC<CallViewProps> = ({
   headphonesIndex,
   onSelectHeadphones,
   partnerLangLabel,
+  outgoingVoice,
+  onSelectOutgoingVoice,
+  incomingVoice,
+  onSelectIncomingVoice,
   duckingFactor,
   onDuckingChange,
   jitterBufferMs,
@@ -80,25 +91,46 @@ export const CallView: React.FC<CallViewProps> = ({
             </span>
           </div>
 
-          {/* Device Controls */}
+          {/* Device & Voice Controls */}
           <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                <Mic className="w-3.5 h-3.5 text-indigo-400" />
-                Мій мікрофон (джерело голосу)
-              </label>
-              <select
-                value={myMicIndex}
-                onChange={(e) => onSelectMyMic(Number(e.target.value))}
-                disabled={state.is_call_active}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-              >
-                {inputDevices.map((d) => (
-                  <option key={d.index} value={d.index}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                  <Mic className="w-3.5 h-3.5 text-indigo-400" />
+                  Мій мікрофон
+                </label>
+                <select
+                  value={myMicIndex}
+                  onChange={(e) => onSelectMyMic(Number(e.target.value))}
+                  disabled={state.is_call_active}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                >
+                  {inputDevices.map((d) => (
+                    <option key={d.index} value={d.index}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  Голос для Zoom (AI)
+                </label>
+                <select
+                  value={outgoingVoice}
+                  onChange={(e) => onSelectOutgoingVoice(e.target.value)}
+                  disabled={state.is_call_active}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-medium"
+                >
+                  {voices.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -140,7 +172,7 @@ export const CallView: React.FC<CallViewProps> = ({
               themeColor="indigo"
             />
             <TranscriptBox
-              title={`Переклад у Zoom (${partnerLangLabel})`}
+              title={`Переклад у Zoom (${partnerLangLabel}) [${outgoingVoice}]`}
               text={state.outgoing.translated_text}
               placeholder="Синхронний AI-переклад транслюватиметься сюди..."
               themeColor="sky"
@@ -171,26 +203,44 @@ export const CallView: React.FC<CallViewProps> = ({
 
           {/* Device Controls */}
           <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                <Mic className="w-3.5 h-3.5 text-emerald-400" />
-                Вхід звуку із Zoom/Meet (BlackHole)
-              </label>
-              <select
-                value={callInputIndex}
-                onChange={(e) => onSelectCallInput(Number(e.target.value))}
-                disabled={state.is_call_active}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
-              >
-                {inputDevices.map((d) => (
-                  <option key={d.index} value={d.index}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[10px] text-slate-500 italic">
-                * У Zoom або Meet виведіть звук співрозмовника на цей віртуальний аудіокабель.
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                  <Mic className="w-3.5 h-3.5 text-emerald-400" />
+                  Вхід звуку із Zoom (BlackHole)
+                </label>
+                <select
+                  value={callInputIndex}
+                  onChange={(e) => onSelectCallInput(Number(e.target.value))}
+                  disabled={state.is_call_active}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                >
+                  {inputDevices.map((d) => (
+                    <option key={d.index} value={d.index}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  Голос у навушники (AI)
+                </label>
+                <select
+                  value={incomingVoice}
+                  onChange={(e) => onSelectIncomingVoice(e.target.value)}
+                  disabled={state.is_call_active}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 font-medium"
+                >
+                  {voices.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -214,7 +264,6 @@ export const CallView: React.FC<CallViewProps> = ({
 
             {/* DSP Controls: Ducking & Jitter Buffer */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-800">
-              {/* Ducking Slider */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
                   <label className="text-[11px] font-medium text-slate-300 flex items-center gap-1">
@@ -236,12 +285,11 @@ export const CallView: React.FC<CallViewProps> = ({
                 />
               </div>
 
-              {/* Jitter Buffer Slider */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
                   <label className="text-[11px] font-medium text-slate-300 flex items-center gap-1">
                     <Sliders className="w-3 h-3 text-indigo-400" />
-                    Згладжування (Jitter Buffer)
+                    Згладжування (Jitter)
                   </label>
                   <span className="text-[11px] font-mono font-semibold text-indigo-400">
                     {jitterBufferMs} мс
@@ -276,7 +324,7 @@ export const CallView: React.FC<CallViewProps> = ({
               themeColor="amber"
             />
             <TranscriptBox
-              title="Переклад у навушниках (Українська)"
+              title={`Переклад у навушниках (Українська) [${incomingVoice}]`}
               text={state.incoming.translated_text}
               placeholder="Український голос та переклад з'являться тут..."
               themeColor="emerald"
@@ -289,7 +337,7 @@ export const CallView: React.FC<CallViewProps> = ({
       <div className="flex justify-center pt-2">
         <button
           onClick={onToggleCall}
-          disabled={isLoading || state.is_testing_active}
+          disabled={isLoading || state.is_testing_active || state.is_mic_test_active}
           className={`w-full max-w-md py-3.5 px-6 rounded-xl font-semibold text-sm flex items-center justify-center gap-2.5 shadow-lg transition-all ${
             state.is_call_active
               ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/40"

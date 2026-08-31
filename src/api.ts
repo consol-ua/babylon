@@ -14,6 +14,12 @@ export interface SampleInfo {
   filename: string;
 }
 
+export interface GeminiVoice {
+  id: string;
+  label: string;
+  gender: "male" | "female";
+}
+
 export interface LogEntry {
   timestamp: string;
   level: "INFO" | "WARN" | "ERROR";
@@ -31,9 +37,13 @@ export interface StreamTelemetry {
 export interface DualBackendState {
   is_call_active: boolean;
   is_testing_active: boolean;
+  is_mic_test_active: boolean;
   active_sample_id: string | null;
   partner_lang: string;
+  outgoing_voice: string;
+  incoming_voice: string;
   jitter_buffer_ms: number;
+  mic_test_latency_ms: number;
   last_error: string | null;
   logs: LogEntry[];
   outgoing: StreamTelemetry;
@@ -46,6 +56,8 @@ export interface CallStartPayload {
   call_input_index?: number;
   headphones_index?: number;
   partner_lang: string;
+  outgoing_voice: string;
+  incoming_voice: string;
   ducking_factor: number;
   jitter_buffer_ms: number;
   api_key?: string;
@@ -57,7 +69,24 @@ export interface SampleStartPayload {
   ducking_factor: number;
   jitter_buffer_ms: number;
   partner_lang: string;
+  voice_name: string;
   api_key?: string;
+}
+
+export interface MicTestStartPayload {
+  mic_index?: number;
+  partner_lang: string;
+  voice_name: string;
+  api_key?: string;
+}
+
+export interface MicTestResult {
+  status: string;
+  latency_ms: number;
+  stt_text: string;
+  translated_text: string;
+  audio_url: string;
+  has_audio: boolean;
 }
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -71,6 +100,18 @@ export async function fetchAudioDevices(): Promise<AudioDevice[]> {
     return data.devices;
   } catch (err) {
     console.error("[API] fetchAudioDevices error:", err);
+    return [];
+  }
+}
+
+export async function fetchVoices(): Promise<GeminiVoice[]> {
+  try {
+    const res = await fetch(`${API_BASE}/voices`);
+    if (!res.ok) throw new Error("Failed to fetch voices");
+    const data = await res.json();
+    return data.voices;
+  } catch (err) {
+    console.error("[API] fetchVoices error:", err);
     return [];
   }
 }
@@ -139,6 +180,28 @@ export async function stopSampleTest(): Promise<void> {
   if (!res.ok) {
     throw new Error("Failed to stop sample test");
   }
+}
+
+export async function startMicTest(payload: MicTestStartPayload): Promise<void> {
+  const res = await fetch(`${API_BASE}/test_mic/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({ detail: "Failed to start mic test" }));
+    throw new Error(errData.detail || "Failed to start mic test");
+  }
+}
+
+export async function stopMicTest(): Promise<MicTestResult> {
+  const res = await fetch(`${API_BASE}/test_mic/stop`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to stop mic test");
+  }
+  return await res.json();
 }
 
 export async function updateDuckingFactor(ducking_factor: number): Promise<void> {

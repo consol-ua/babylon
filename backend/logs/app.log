@@ -53,3 +53,57 @@
 [2026-08-31 23:03:19,573] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'System Architecture Interview' (буфер: 200мс, ducking: 5%).
 [2026-08-31 23:03:40,765] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено.
 [2026-08-31 23:03:40,765] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено.
+[2026-08-31 23:06:42,533] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 200мс, ducking: 25%).
+[2026-08-31 23:06:42,533] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 200мс, ducking: 25%).
+[2026-08-31 23:07:07,688] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:07:07,688] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:07:20,174] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 200мс, ducking: 25%).
+[2026-08-31 23:07:20,174] [INFO] [gemini_translator]: [sample] Запуск тестування семплу 'IT Daily Standup' (буфер: 200мс, ducking: 25%).
+[2026-08-31 23:07:44,494] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:07:44,494] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено.
+[2026-08-31 23:07:45,599] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено користувачем.
+[2026-08-31 23:07:45,599] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено користувачем.
+[2026-08-31 23:13:31,623] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:31,787] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:31,787] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:42,417] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:42,579] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:42,579] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:53,450] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:53,623] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:13:53,623] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:15:14,064] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:15:14,219] [INFO] [gemini_translator]: [mic_test] Початок тесту мікрофона (UA -> en, голос: Puck).
+[2026-08-31 23:15:14,394] [INFO] [gemini_translator]: [mic_test] Фіналізація запису тесту мікрофона...
+[2026-08-31 23:15:16,314] [INFO] [gemini_translator]: [mic_test] Тест мікрофона завершено. Затримка: 750мс. Готово до прослуховування.
+[2026-08-31 23:15:16,337] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:15:16,352] [ERROR] [gemini_translator]: [GeminiAPI:CONNECT_FAILED] Не вдалося встановити сесію Live Translate: [Errno 8] nodename nor servname provided, or not known
+[2026-08-31 23:15:16,478] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:15:16,482] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:16:30,534] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 125 мс.
+[2026-08-31 23:16:30,534] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 125 мс.
+[2026-08-31 23:16:31,435] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 100 мс.
+[2026-08-31 23:16:31,435] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 100 мс.
+[2026-08-31 23:16:41,306] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:16:41,306] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:17:09,832] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:17:09,832] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:17:30,493] [INFO] [gemini_translator]: [mic_test] Початок тесту мікрофона (UA -> en, голос: Puck).
+[2026-08-31 23:17:30,493] [INFO] [gemini_translator]: [mic_test] Початок тесту мікрофона (UA -> en, голос: Puck).
+[2026-08-31 23:17:36,973] [INFO] [gemini_translator]: [mic_test] Фіналізація запису тесту мікрофона...
+[2026-08-31 23:17:36,973] [INFO] [gemini_translator]: [mic_test] Фіналізація запису тесту мікрофона...
+[2026-08-31 23:17:38,896] [INFO] [gemini_translator]: [mic_test] Тест мікрофона завершено. Затримка: 4387мс. Готово до прослуховування.
+[2026-08-31 23:17:38,896] [INFO] [gemini_translator]: [mic_test] Тест мікрофона завершено. Затримка: 4387мс. Готово до прослуховування.
+[2026-08-31 23:20:33,748] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:20:33,912] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:20:33,912] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:20:49,108] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:20:49,267] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:20:49,267] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:21:01,019] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:21:01,183] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:21:01,183] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:22:13,310] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:22:13,310] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:22:41,968] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:22:41,968] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).

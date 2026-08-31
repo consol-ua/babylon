@@ -3,10 +3,11 @@ import asyncio
 import os
 import wave
 import time
-import threading
+from pathlib import Path
 import numpy as np
 import pyaudio
 from typing import List, Dict, Optional, Callable
+import threading
 
 
 class AudioStreamBuffer:
@@ -35,7 +36,6 @@ class AudioStreamBuffer:
         if len(samples) == 0:
             return
         if len(self._buffer) == 0 and self._is_buffering:
-            # First arrival of new utterance
             self._is_buffering = True
 
         self._buffer = np.concatenate((self._buffer, samples))
@@ -54,7 +54,6 @@ class AudioStreamBuffer:
             return None
 
         if self._is_buffering:
-            # If buffer has accumulated enough samples or timed out waiting
             if len(self._buffer) >= self.target_buffer_samples or (time.time() - self._last_push_time > 0.25):
                 self._is_buffering = False
             else:
@@ -65,7 +64,7 @@ class AudioStreamBuffer:
             self._buffer = self._buffer[num_samples:]
             return chunk
         else:
-            # Drain remaining samples and pad with silence to avoid click
+            # Drain remaining samples
             chunk = np.pad(self._buffer, (0, num_samples - len(self._buffer)))
             self._buffer = np.array([], dtype=np.int16)
             self._is_buffering = True
@@ -132,7 +131,6 @@ class SmartDuckingDSP:
         else:
             time_since_voice = (now - self.last_voice_activity_time) * 1000.0
             if time_since_voice < self.hold_ms:
-                # Still within hold window
                 target_gain = self.ducking_factor
                 self.is_active = True
             else:
@@ -141,25 +139,20 @@ class SmartDuckingDSP:
 
         # Calculate gain transition rates
         if target_gain < self.current_gain:
-            # Attack phase (fade down)
             rate_per_sec = (1.0 - self.ducking_factor) / (self.attack_ms / 1000.0)
             max_gain_delta = rate_per_sec * chunk_duration
             end_gain = max(target_gain, self.current_gain - max_gain_delta)
         else:
-            # Release phase (fade back up)
             rate_per_sec = (1.0 - self.ducking_factor) / (self.release_ms / 1000.0)
             max_gain_delta = rate_per_sec * chunk_duration
             end_gain = min(target_gain, self.current_gain + max_gain_delta)
 
-        # Create smooth linear gain ramp for this chunk
         gain_ramp = np.linspace(self.current_gain, end_gain, chunk_len, dtype=np.float32)
         self.current_gain = end_gain
 
-        # Apply gain ramp to background
         bg_float = background_chunk.astype(np.float32)
         ducked_bg = bg_float * gain_ramp
 
-        # Mix voiceover if present
         if voiceover_chunk is not None and len(voiceover_chunk) > 0:
             vo_float = voiceover_chunk.astype(np.float32)
             if len(vo_float) < chunk_len:
@@ -177,9 +170,7 @@ class SmartDuckingDSP:
 
 class DualChannelAudioEngine:
     """
-    High-performance audio engine for bidirectional translation and sample playback.
-    Integrated with smart DSP ducking and jitter FIFO streaming.
-    Thread-safe PortAudio stream management to eliminate race conditions and double-free issues.
+    High-performance audio engine for bidirectional translation, sample playback, and mic testing.
     """
 
     def __init__(
@@ -194,7 +185,6 @@ class DualChannelAudioEngine:
         self.rate = rate
         self.chunk_size = chunk_size
 
-        self._lock = threading.RLock()
         self.p: pyaudio.PyAudio = pyaudio.PyAudio()
 
         # Outgoing streams
@@ -205,13 +195,20 @@ class DualChannelAudioEngine:
         self.call_input_stream: Optional[pyaudio.Stream] = None
         self.headphones_stream: Optional[pyaudio.Stream] = None
 
+        # Mic testing stream
+        self.mic_test_stream: Optional[pyaudio.Stream] = None
+
         # Input Queues for Gemini STT
         self.outgoing_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
         self.incoming_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
 
-        # Audio Stream FIFO Buffers for Playback (Smooth playback, no discarded samples)
+        # Audio Stream FIFO Buffers for Playback
         self.outgoing_playback_buffer = AudioStreamBuffer(sample_rate=rate, jitter_buffer_ms=150)
         self.incoming_playback_buffer = AudioStreamBuffer(sample_rate=rate, jitter_buffer_ms=150)
+
+        # Mic Test Audio Collector (Recorded translated PCM)
+        self.mic_test_recorded_pcm: List[np.ndarray] = []
+        self.mic_test_file_path: Path = Path(__file__).parent / "samples" / "mic_test_result.wav"
 
         # Smart Ducking DSP Engines
         self.incoming_ducking_dsp = SmartDuckingDSP(sample_rate=rate, ducking_factor=0.2)
@@ -219,60 +216,21 @@ class DualChannelAudioEngine:
         # Status flags
         self.is_call_running: bool = False
         self.is_sample_running: bool = False
+        self.is_mic_test_running: bool = False
         self.is_incoming_ducking: bool = False
+
+        # Thread synchronization lock for PyAudio C-extension calls
+        self._stream_lock: threading.Lock = threading.Lock()
 
         # Telemetry Callbacks
         self.outgoing_telemetry_cb: Optional[Callable[[float], None]] = None
         self.incoming_telemetry_cb: Optional[Callable[[float, bool], None]] = None
 
-    def _safe_read_stream(self, stream: Optional[pyaudio.Stream], num_frames: int) -> Optional[bytes]:
-        """Thread-safe stream read with overflow handling."""
-        with self._lock:
-            if not stream:
-                return None
-            try:
-                if not stream.is_active() or stream.is_stopped():
-                    return None
-                return stream.read(num_frames, exception_on_overflow=False)
-            except Exception:
-                return None
-
-    def _safe_write_stream(self, stream: Optional[pyaudio.Stream], data: bytes) -> None:
-        """Thread-safe stream write."""
-        with self._lock:
-            if not stream:
-                return
-            try:
-                if not stream.is_active() or stream.is_stopped():
-                    return
-                stream.write(data)
-            except Exception:
-                pass
-
-    def _safe_close_stream(self, stream: Optional[pyaudio.Stream]) -> None:
-        """Thread-safe and idempotent stream stop and close."""
-        with self._lock:
-            if not stream:
-                return
-            try:
-                if stream.is_active():
-                    stream.stop_stream()
-            except Exception:
-                pass
-            try:
-                stream.close()
-            except Exception:
-                pass
-
     def list_devices(self) -> List[Dict[str, str | int]]:
         """List all available audio input and output devices."""
         devices: List[Dict[str, str | int]] = []
-        with self._lock:
-            try:
-                device_count = self.p.get_device_count()
-            except Exception:
-                return devices
-
+        with self._stream_lock:
+            device_count = self.p.get_device_count()
             for i in range(device_count):
                 try:
                     info = self.p.get_device_info_by_index(i)
@@ -290,32 +248,70 @@ class DualChannelAudioEngine:
         return devices
 
     def set_ducking_factor(self, factor: float) -> None:
-        """Set ducking attenuation factor (0.0 = full mute, 1.0 = no ducking)."""
         self.incoming_ducking_dsp.set_ducking_factor(factor)
 
     def set_jitter_buffer_ms(self, ms: int) -> None:
-        """Set jitter buffer size in ms for both playback channels."""
         self.outgoing_playback_buffer.set_jitter_buffer_ms(ms)
         self.incoming_playback_buffer.set_jitter_buffer_ms(ms)
 
     def _calculate_rms_db(self, audio_data: np.ndarray) -> float:
-        """Calculate RMS volume in dB."""
         float_data = audio_data.astype(np.float32)
         rms = np.sqrt(np.mean(float_data**2))
         if rms > 0:
             return float(20 * np.log10(rms / 32767.0))
         return -100.0
 
+    def _safe_read(self, stream: Optional[pyaudio.Stream], chunk_size: int) -> Optional[bytes]:
+        """Safely read audio from PyAudio stream without race conditions or memory crashes on close."""
+        if stream is None:
+            return None
+        try:
+            with self._stream_lock:
+                if stream.is_stopped() or not stream.is_active():
+                    return None
+                # Check available frames before blocking read on macOS CoreAudio
+                available = stream.get_read_available()
+                if available < chunk_size:
+                    time.sleep(0.005)
+                return stream.read(chunk_size, exception_on_overflow=False)
+        except Exception:
+            return None
+
+    def _safe_write(self, stream: Optional[pyaudio.Stream], data: bytes) -> bool:
+        """Safely write audio data to PyAudio output stream."""
+        if stream is None:
+            return False
+        try:
+            with self._stream_lock:
+                if stream.is_stopped() or not stream.is_active():
+                    return False
+                stream.write(data)
+                return True
+        except Exception:
+            return False
+
+    def _safe_close_stream(self, stream_attr: str) -> None:
+        """Safely stop and close an audio stream protected by stream lock."""
+        with self._stream_lock:
+            stream = getattr(self, stream_attr, None)
+            if stream is not None:
+                try:
+                    if stream.is_active():
+                        stream.stop_stream()
+                    stream.close()
+                except Exception:
+                    pass
+                setattr(self, stream_attr, None)
+
     def push_outgoing_tts_chunk(self, chunk: np.ndarray) -> None:
-        """Push translated speech chunk to outgoing buffer for Zoom/Meet."""
         self.outgoing_playback_buffer.push(chunk)
+        if self.is_mic_test_running:
+            self.mic_test_recorded_pcm.append(chunk)
 
     def push_incoming_tts_chunk(self, chunk: np.ndarray) -> None:
-        """Push translated speech chunk to incoming buffer for headphones."""
         self.incoming_playback_buffer.push(chunk)
 
     def clear_playback_buffers(self) -> None:
-        """Clear buffers on interrupt or stop."""
         self.outgoing_playback_buffer.clear()
         self.incoming_playback_buffer.clear()
 
@@ -326,14 +322,12 @@ class DualChannelAudioEngine:
         call_input_index: Optional[int] = None,
         headphones_index: Optional[int] = None,
     ) -> None:
-        """Start all audio streams for full-duplex call translation."""
-        with self._lock:
-            if self.is_call_running:
-                return
+        if self.is_call_running:
+            return
 
-            self.clear_playback_buffers()
+        self.clear_playback_buffers()
 
-            # 1. Outgoing Input (My Microphone)
+        with self._stream_lock:
             self.my_mic_stream = self.p.open(
                 format=self.format_type,
                 channels=self.channels,
@@ -343,7 +337,6 @@ class DualChannelAudioEngine:
                 frames_per_buffer=self.chunk_size,
             )
 
-            # 2. Outgoing Output (Virtual Mic for Zoom/Meet)
             if call_virtual_mic_index is not None:
                 self.call_virtual_mic_stream = self.p.open(
                     format=self.format_type,
@@ -354,7 +347,6 @@ class DualChannelAudioEngine:
                     frames_per_buffer=self.chunk_size,
                 )
 
-            # 3. Incoming Input (Audio from Zoom/Meet)
             if call_input_index is not None:
                 self.call_input_stream = self.p.open(
                     format=self.format_type,
@@ -365,7 +357,6 @@ class DualChannelAudioEngine:
                     frames_per_buffer=self.chunk_size,
                 )
 
-            # 4. Incoming Output (Headphones / Speakers)
             self.headphones_stream = self.p.open(
                 format=self.format_type,
                 channels=self.channels,
@@ -375,39 +366,30 @@ class DualChannelAudioEngine:
                 frames_per_buffer=self.chunk_size,
             )
 
-            self.is_call_running = True
+        self.is_call_running = True
 
-    async def stop_call(self) -> None:
-        """Gracefully stop and close all call streams."""
-        if not self.is_call_running:
-            return
-
+    def stop_call(self) -> None:
         self.is_call_running = False
-        await asyncio.sleep(0.05)
+        time.sleep(0.03)  # Allow background executor tasks to exit read/write
 
-        with self._lock:
-            for stream_attr in [
-                "my_mic_stream",
-                "call_virtual_mic_stream",
-                "call_input_stream",
-                "headphones_stream",
-            ]:
-                stream = getattr(self, stream_attr)
-                if stream:
-                    self._safe_close_stream(stream)
-                    setattr(self, stream_attr, None)
+        for stream_attr in [
+            "my_mic_stream",
+            "call_virtual_mic_stream",
+            "call_input_stream",
+            "headphones_stream",
+        ]:
+            self._safe_close_stream(stream_attr)
 
         self._drain_queues()
         self.clear_playback_buffers()
 
     def start_sample_test(self, headphones_index: Optional[int] = None) -> None:
-        """Start headphones stream for testing demo sample audio."""
-        with self._lock:
-            if self.is_sample_running:
-                return
+        if self.is_sample_running:
+            return
 
-            self.clear_playback_buffers()
+        self.clear_playback_buffers()
 
+        with self._stream_lock:
             self.headphones_stream = self.p.open(
                 format=self.format_type,
                 channels=self.channels,
@@ -416,26 +398,54 @@ class DualChannelAudioEngine:
                 output_device_index=headphones_index,
                 frames_per_buffer=self.chunk_size,
             )
-            self.is_sample_running = True
+        self.is_sample_running = True
 
-    async def stop_sample_test(self) -> None:
-        """Gracefully stop sample testing stream."""
-        if not self.is_sample_running:
-            return
-
+    def stop_sample_test(self) -> None:
         self.is_sample_running = False
-        await asyncio.sleep(0.05)
-
-        with self._lock:
-            if self.headphones_stream:
-                self._safe_close_stream(self.headphones_stream)
-                self.headphones_stream = None
-
+        time.sleep(0.03)
+        self._safe_close_stream("headphones_stream")
         self._drain_queues()
         self.clear_playback_buffers()
 
+    def start_mic_test(self, mic_index: Optional[int] = None) -> None:
+        """Start microphone test recording session."""
+        if self.is_mic_test_running:
+            return
+
+        self.mic_test_recorded_pcm = []
+        self.clear_playback_buffers()
+
+        with self._stream_lock:
+            self.mic_test_stream = self.p.open(
+                format=self.format_type,
+                channels=self.channels,
+                rate=self.rate,
+                input=True,
+                input_device_index=mic_index,
+                frames_per_buffer=self.chunk_size,
+            )
+        self.is_mic_test_running = True
+
+    def stop_mic_test(self) -> Optional[str]:
+        """Stop mic test recording and save translated WAV file."""
+        self.is_mic_test_running = False
+        time.sleep(0.03)
+        self._safe_close_stream("mic_test_stream")
+        self._drain_queues()
+
+        # Save collected translated audio to WAV file
+        if len(self.mic_test_recorded_pcm) > 0:
+            full_audio = np.concatenate(self.mic_test_recorded_pcm)
+            self.mic_test_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with wave.open(str(self.mic_test_file_path), "wb") as wf:
+                wf.setnchannels(self.channels)
+                wf.setsampwidth(2)  # 16-bit
+                wf.setframerate(self.rate)
+                wf.writeframes(full_audio.tobytes())
+            return str(self.mic_test_file_path)
+        return None
+
     def _drain_queues(self) -> None:
-        """Clear remaining items from audio queues."""
         for q in [self.outgoing_input_queue, self.incoming_input_queue]:
             while not q.empty():
                 try:
@@ -444,10 +454,6 @@ class DualChannelAudioEngine:
                     break
 
     async def outgoing_process_loop(self) -> None:
-        """
-        Outgoing loop:
-        Reads User Mic -> Pushes to Gemini Live (UA->Target) -> Reads clean TTS from buffer -> Writes to Virtual Mic.
-        """
         loop = asyncio.get_running_loop()
 
         while self.is_call_running:
@@ -458,7 +464,7 @@ class DualChannelAudioEngine:
             try:
                 raw_mic_bytes = await loop.run_in_executor(
                     None,
-                    self._safe_read_stream,
+                    self._safe_read,
                     self.my_mic_stream,
                     self.chunk_size,
                 )
@@ -474,26 +480,57 @@ class DualChannelAudioEngine:
                     db = self._calculate_rms_db(mic_audio)
                     self.outgoing_telemetry_cb(db)
 
-                # Output clean translated speech to Zoom/Meet virtual mic
-                if self.call_virtual_mic_stream and self.is_call_running:
+                if self.call_virtual_mic_stream:
                     tts_chunk = self.outgoing_playback_buffer.pop(self.chunk_size)
-                    if tts_chunk is not None:
+                    if tts_chunk is not None and self.is_call_running:
                         await loop.run_in_executor(
                             None,
-                            self._safe_write_stream,
+                            self._safe_write,
                             self.call_virtual_mic_stream,
                             tts_chunk.tobytes(),
                         )
 
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 print(f"[Outgoing Loop Error] {e}")
                 await asyncio.sleep(0.01)
 
+    async def mic_test_loop(self) -> None:
+        """Capture user voice during microphone test and stream to outgoing_ai."""
+        loop = asyncio.get_running_loop()
+
+        while self.is_mic_test_running:
+            if not self.mic_test_stream:
+                await asyncio.sleep(0.01)
+                continue
+
+            try:
+                raw_mic_bytes = await loop.run_in_executor(
+                    None,
+                    self._safe_read,
+                    self.mic_test_stream,
+                    self.chunk_size,
+                )
+
+                if not raw_mic_bytes or not self.is_mic_test_running:
+                    await asyncio.sleep(0.01)
+                    continue
+
+                await self.outgoing_input_queue.put(raw_mic_bytes)
+
+                mic_audio = np.frombuffer(raw_mic_bytes, dtype=np.int16)
+                if self.outgoing_telemetry_cb:
+                    db = self._calculate_rms_db(mic_audio)
+                    self.outgoing_telemetry_cb(db)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[Mic Test Loop Error] {e}")
+                await asyncio.sleep(0.01)
+
     async def incoming_process_loop(self) -> None:
-        """
-        Incoming loop:
-        Reads Call Audio (BlackHole) -> Pushes to Gemini Live -> Mixes with Ukrainian Voice via SmartDuckingDSP -> Writes to Headphones.
-        """
         loop = asyncio.get_running_loop()
 
         while self.is_call_running:
@@ -504,7 +541,7 @@ class DualChannelAudioEngine:
             try:
                 raw_call_bytes = await loop.run_in_executor(
                     None,
-                    self._safe_read_stream,
+                    self._safe_read,
                     self.call_input_stream,
                     self.chunk_size,
                 )
@@ -516,10 +553,8 @@ class DualChannelAudioEngine:
                 await self.incoming_input_queue.put(raw_call_bytes)
                 call_audio_chunk = np.frombuffer(raw_call_bytes, dtype=np.int16)
 
-                # Extract exact-length voiceover chunk from smooth FIFO buffer
                 voiceover_chunk = self.incoming_playback_buffer.pop(self.chunk_size)
 
-                # Mix with smart attack/hold/release ducking
                 mixed_output, is_ducking = self.incoming_ducking_dsp.process(
                     call_audio_chunk, voiceover_chunk
                 )
@@ -532,18 +567,25 @@ class DualChannelAudioEngine:
                 if self.headphones_stream and self.is_call_running:
                     await loop.run_in_executor(
                         None,
-                        self._safe_write_stream,
+                        self._safe_write,
                         self.headphones_stream,
                         mixed_output.tobytes(),
                     )
 
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 print(f"[Incoming Loop Error] {e}")
                 await asyncio.sleep(0.01)
 
-    async def sample_playback_loop(self, sample_filepath: str) -> None:
+    async def sample_playback_loop(
+        self,
+        sample_filepath: str,
+        ai_session_check: Optional[Callable[[], bool]] = None,
+    ) -> None:
         """
         Feeds pre-recorded WAV sample into incoming AI pipeline and plays mixed Ukrainian voice to headphones.
+        Includes turn completion drain to prevent cutting off the last phrases!
         """
         if not os.path.exists(sample_filepath):
             print(f"[Sample Error] File not found: {sample_filepath}")
@@ -568,7 +610,6 @@ class DualChannelAudioEngine:
 
                     await self.incoming_input_queue.put(raw_bytes)
 
-                    # Extract exact voiceover chunk from buffer
                     voiceover_chunk = self.incoming_playback_buffer.pop(self.chunk_size)
 
                     mixed_output, is_ducking = self.incoming_ducking_dsp.process(
@@ -583,47 +624,78 @@ class DualChannelAudioEngine:
                     if self.headphones_stream and self.is_sample_running:
                         await loop.run_in_executor(
                             None,
-                            self._safe_write_stream,
+                            self._safe_write,
                             self.headphones_stream,
                             mixed_output.tobytes(),
                         )
 
                     await asyncio.sleep(chunk_duration_sec * 0.95)
 
-                # Allow buffered voiceover queue to finish playing out
-                drain_timeout = 8.0
-                start_time = time.time()
-                while self.is_sample_running and self.incoming_playback_buffer.has_audio():
-                    if time.time() - start_time > drain_timeout:
+                # Send 0.5s of silence frames so Gemini VAD cleanly marks end of speech
+                silence_frame = np.zeros(self.chunk_size, dtype=np.int16).tobytes()
+                for _ in range(8):
+                    if not self.is_sample_running:
                         break
+                    await self.incoming_input_queue.put(silence_frame)
+                    await asyncio.sleep(chunk_duration_sec)
+
+                # Intelligent completion drain:
+                # Wait until Gemini finishes turn AND buffer is completely emptied to headphones
+                max_drain_timeout = 10.0
+                drain_start = time.time()
+                last_active_time = time.time()
+
+                while self.is_sample_running:
+                    elapsed = time.time() - drain_start
+                    if elapsed > max_drain_timeout:
+                        break
+
+                    # Check if playback buffer has voiceover
                     voiceover_chunk = self.incoming_playback_buffer.pop(self.chunk_size)
+                    if voiceover_chunk is not None and np.any(np.abs(voiceover_chunk) > 30):
+                        last_active_time = time.time()
+
                     silent_bg = np.zeros(self.chunk_size, dtype=np.int16)
                     mixed_output, is_ducking = self.incoming_ducking_dsp.process(
                         silent_bg, voiceover_chunk
                     )
                     self.is_incoming_ducking = is_ducking
+
                     if self.incoming_telemetry_cb:
                         self.incoming_telemetry_cb(-100.0, self.is_incoming_ducking)
+
                     if self.headphones_stream and self.is_sample_running:
                         await loop.run_in_executor(
                             None,
-                            self._safe_write_stream,
+                            self._safe_write,
                             self.headphones_stream,
                             mixed_output.tobytes(),
                         )
+
+                    # If no new voiceover for 3.5s and buffer is empty
+                    if (
+                        time.time() - last_active_time > 3.5
+                        and not self.incoming_playback_buffer.has_audio()
+                    ):
+                        break
+
                     await asyncio.sleep(chunk_duration_sec * 0.95)
 
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             print(f"[Sample Playback Error] {e}")
         finally:
             self.is_sample_running = False
 
-    async def terminate(self) -> None:
-        """Cleanup PyAudio instance safely."""
-        await self.stop_call()
-        await self.stop_sample_test()
-        with self._lock:
+    def terminate(self) -> None:
+        """Cleanup PyAudio instance."""
+        self.stop_call()
+        self.stop_sample_test()
+        self.stop_mic_test()
+        with self._stream_lock:
             try:
                 self.p.terminate()
             except Exception:
                 pass
+

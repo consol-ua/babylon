@@ -2,16 +2,21 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   fetchAudioDevices,
   fetchSamples,
+  fetchVoices,
   startCall,
   stopCall,
   startSampleTest,
   stopSampleTest,
+  startMicTest,
+  stopMicTest,
   updateDuckingFactor,
   updateJitterBuffer,
   subscribeToState,
   AudioDevice,
   SampleInfo,
+  GeminiVoice,
   DualBackendState,
+  MicTestResult,
 } from "./api";
 import { CallView } from "./components/CallView";
 import { TestingView } from "./components/TestingView";
@@ -42,14 +47,28 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: "zh", label: "Chinese (Китайська)" },
 ];
 
+export const DEFAULT_VOICES: GeminiVoice[] = [
+  { id: "Puck", label: "Puck (Чоловічий / Енергійний, природний)", gender: "male" },
+  { id: "Charon", label: "Charon (Чоловічий / Впевнений, спокійний)", gender: "male" },
+  { id: "Fenrir", label: "Fenrir (Чоловічий / Низький тембр)", gender: "male" },
+  { id: "Aoede", label: "Aoede (Жіночий / Виразний, глибокий)", gender: "female" },
+  { id: "Kore", label: "Kore (Жіночий / Спокійний, м'який)", gender: "female" },
+];
+
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"call" | "testing">("call");
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [samples, setSamples] = useState<SampleInfo[]>([]);
+  const [voices, setVoices] = useState<GeminiVoice[]>(DEFAULT_VOICES);
   const [selectedSampleId, setSelectedSampleId] = useState<string>("it_standup");
 
-  // Language & API Key
+  // Language, Voices & API Key
   const [partnerLang, setPartnerLang] = useState<string>("en");
+  const [outgoingVoice, setOutgoingVoice] = useState<string>("Puck");
+  const [incomingVoice, setIncomingVoice] = useState<string>("Aoede");
+  const [sampleVoice, setSampleVoice] = useState<string>("Aoede");
+  const [micTestVoice, setMicTestVoice] = useState<string>("Puck");
+
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem("GEMINI_API_KEY") || "");
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
 
@@ -67,9 +86,13 @@ export const App: React.FC = () => {
   const [backendState, setBackendState] = useState<DualBackendState>({
     is_call_active: false,
     is_testing_active: false,
+    is_mic_test_active: false,
     active_sample_id: null,
     partner_lang: "en",
+    outgoing_voice: "Puck",
+    incoming_voice: "Aoede",
     jitter_buffer_ms: 150,
+    mic_test_latency_ms: 0,
     last_error: null,
     logs: [],
     outgoing: { stt_text: "", translated_text: "", volume_db: -100 },
@@ -78,27 +101,29 @@ export const App: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Initialize Devices and Samples
+  // Initialize Devices, Samples, and Voices
   useEffect(() => {
-    Promise.all([fetchAudioDevices(), fetchSamples()]).then(([devs, smps]) => {
-      setDevices(devs);
-      setSamples(smps);
+    Promise.all([fetchAudioDevices(), fetchSamples(), fetchVoices()]).then(
+      ([devs, smps, vcs]) => {
+        setDevices(devs);
+        setSamples(smps);
+        if (vcs.length > 0) setVoices(vcs);
 
-      const inputs = devs.filter((d) => d.max_input_channels > 0);
-      const outputs = devs.filter((d) => d.max_output_channels > 0);
+        const inputs = devs.filter((d) => d.max_input_channels > 0);
+        const outputs = devs.filter((d) => d.max_output_channels > 0);
 
-      // Heuristic for default device selection
-      const blackholeIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole"));
-      const blackholeOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole"));
-      const defaultMic = inputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || inputs[0];
-      const defaultHeadphones = outputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || outputs[0];
+        const blackholeIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole"));
+        const blackholeOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole"));
+        const defaultMic = inputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || inputs[0];
+        const defaultHeadphones = outputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || outputs[0];
 
-      if (defaultMic) setMyMicIndex(defaultMic.index);
-      if (blackholeOut) setCallVirtualMicIndex(blackholeOut.index);
-      if (blackholeIn) setCallInputIndex(blackholeIn.index);
-      else if (inputs.length > 1) setCallInputIndex(inputs[1].index);
-      if (defaultHeadphones) setHeadphonesIndex(defaultHeadphones.index);
-    });
+        if (defaultMic) setMyMicIndex(defaultMic.index);
+        if (blackholeOut) setCallVirtualMicIndex(blackholeOut.index);
+        if (blackholeIn) setCallInputIndex(blackholeIn.index);
+        else if (inputs.length > 1) setCallInputIndex(inputs[1].index);
+        if (defaultHeadphones) setHeadphonesIndex(defaultHeadphones.index);
+      }
+    );
 
     const unsubscribe = subscribeToState((newState) => {
       setBackendState(newState);
@@ -139,6 +164,8 @@ export const App: React.FC = () => {
           call_input_index: callInputIndex,
           headphones_index: headphonesIndex,
           partner_lang: partnerLang,
+          outgoing_voice: outgoingVoice,
+          incoming_voice: incomingVoice,
           ducking_factor: duckingFactor,
           jitter_buffer_ms: jitterBufferMs,
           api_key: apiKey || undefined,
@@ -156,12 +183,14 @@ export const App: React.FC = () => {
     callInputIndex,
     headphonesIndex,
     partnerLang,
+    outgoingVoice,
+    incomingVoice,
     duckingFactor,
     jitterBufferMs,
     apiKey,
   ]);
 
-  const handleToggleTest = useCallback(async () => {
+  const handleToggleSampleTest = useCallback(async () => {
     setIsLoading(true);
     try {
       if (backendState.is_testing_active) {
@@ -171,6 +200,7 @@ export const App: React.FC = () => {
           sample_id: selectedSampleId,
           headphones_index: headphonesIndex,
           partner_lang: partnerLang,
+          voice_name: sampleVoice,
           ducking_factor: duckingFactor,
           jitter_buffer_ms: jitterBufferMs,
           api_key: apiKey || undefined,
@@ -186,10 +216,39 @@ export const App: React.FC = () => {
     selectedSampleId,
     headphonesIndex,
     partnerLang,
+    sampleVoice,
     duckingFactor,
     jitterBufferMs,
     apiKey,
   ]);
+
+  const handleStartMicTest = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await startMicTest({
+        mic_index: myMicIndex,
+        partner_lang: partnerLang,
+        voice_name: micTestVoice,
+        api_key: apiKey || undefined,
+      });
+    } catch (err) {
+      console.error("[Mic Test Start Error]", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [myMicIndex, partnerLang, micTestVoice, apiKey]);
+
+  const handleStopMicTest = useCallback(async (): Promise<MicTestResult | undefined> => {
+    setIsLoading(true);
+    try {
+      return await stopMicTest();
+    } catch (err) {
+      console.error("[Mic Test Stop Error]", err);
+      return undefined;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const partnerLangOption = useMemo(
     () => SUPPORTED_LANGUAGES.find((l) => l.code === partnerLang) || SUPPORTED_LANGUAGES[0],
@@ -217,7 +276,7 @@ export const App: React.FC = () => {
               className={`inline-block w-2.5 h-2.5 rounded-full ${
                 backendState.is_call_active
                   ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
-                  : backendState.is_testing_active
+                  : backendState.is_testing_active || backendState.is_mic_test_active
                   ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
                   : "bg-slate-600"
               }`}
@@ -227,6 +286,8 @@ export const App: React.FC = () => {
                 ? "Дзвінок активний"
                 : backendState.is_testing_active
                 ? "Тестування запису"
+                : backendState.is_mic_test_active
+                ? "Запис тесту мікрофона"
                 : "В очікуванні"}
             </span>
           </div>
@@ -244,7 +305,7 @@ export const App: React.FC = () => {
           <select
             value={partnerLang}
             onChange={(e) => setPartnerLang(e.target.value)}
-            disabled={backendState.is_call_active || backendState.is_testing_active}
+            disabled={backendState.is_call_active || backendState.is_testing_active || backendState.is_mic_test_active}
             className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-medium"
           >
             {SUPPORTED_LANGUAGES.map((lang) => (
@@ -276,7 +337,7 @@ export const App: React.FC = () => {
             placeholder="Введіть AIzaSy... (або залиште порожнім, якщо є .env)"
             value={apiKey}
             onChange={(e) => handleApiKeyChange(e.target.value)}
-            disabled={backendState.is_call_active || backendState.is_testing_active}
+            disabled={backendState.is_call_active || backendState.is_testing_active || backendState.is_mic_test_active}
             className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-mono"
           />
         </div>
@@ -305,7 +366,7 @@ export const App: React.FC = () => {
           }`}
         >
           <FlaskConical className="w-4 h-4" />
-          Тестування записів (Demo Playground)
+          Тестування та мікрофон (Playground)
         </button>
       </div>
 
@@ -314,6 +375,7 @@ export const App: React.FC = () => {
         {activeTab === "call" ? (
           <CallView
             devices={devices}
+            voices={voices}
             myMicIndex={myMicIndex}
             onSelectMyMic={setMyMicIndex}
             callVirtualMicIndex={callVirtualMicIndex}
@@ -323,6 +385,10 @@ export const App: React.FC = () => {
             headphonesIndex={headphonesIndex}
             onSelectHeadphones={setHeadphonesIndex}
             partnerLangLabel={partnerLangOption.label}
+            outgoingVoice={outgoingVoice}
+            onSelectOutgoingVoice={setOutgoingVoice}
+            incomingVoice={incomingVoice}
+            onSelectIncomingVoice={setIncomingVoice}
             duckingFactor={duckingFactor}
             onDuckingChange={handleDuckingChange}
             jitterBufferMs={jitterBufferMs}
@@ -334,19 +400,28 @@ export const App: React.FC = () => {
         ) : (
           <TestingView
             samples={samples}
+            voices={voices}
             selectedSampleId={selectedSampleId}
             onSelectSample={setSelectedSampleId}
             devices={devices}
+            myMicIndex={myMicIndex}
+            onSelectMyMic={setMyMicIndex}
             headphonesIndex={headphonesIndex}
             onSelectHeadphones={setHeadphonesIndex}
             partnerLangLabel={partnerLangOption.label}
+            sampleVoice={sampleVoice}
+            onSelectSampleVoice={setSampleVoice}
+            micTestVoice={micTestVoice}
+            onSelectMicTestVoice={setMicTestVoice}
             duckingFactor={duckingFactor}
             onDuckingChange={handleDuckingChange}
             jitterBufferMs={jitterBufferMs}
             onJitterBufferChange={handleJitterBufferChange}
             state={backendState}
             isLoading={isLoading}
-            onToggleTest={handleToggleTest}
+            onToggleSampleTest={handleToggleSampleTest}
+            onStartMicTest={handleStartMicTest}
+            onStopMicTest={handleStopMicTest}
           />
         )}
 
