@@ -107,3 +107,38 @@
 [2026-08-31 23:22:13,310] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
 [2026-08-31 23:22:41,968] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
 [2026-08-31 23:22:41,968] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:27:00,710] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:00,873] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:00,873] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:03,943] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:04,106] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:04,106] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:09,392] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:09,553] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:09,553] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:10,989] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:11,149] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:11,149] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:16,914] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:17,076] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:17,076] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:18,411] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:18,577] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:18,577] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:26,593] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:26,766] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:27:26,766] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:31:44,358] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-08-31 23:31:44,358] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-08-31 23:31:53,676] [ERROR] [gemini_translator]: [GeminiAPI:RECV_ERROR] Помилка прийому аудіопотоку: 1000 None. 
+[2026-08-31 23:31:53,676] [ERROR] [gemini_translator]: [GeminiAPI:RECV_ERROR] Помилка прийому аудіопотоку: 1000 None. 
+[2026-08-31 23:31:54,809] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-08-31 23:31:54,809] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-08-31 23:32:06,031] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-08-31 23:32:06,031] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-08-31 23:32:06,510] [ERROR] [gemini_translator]: [GeminiAPI:SEND_ERROR] Помилка відправки аудіо: sent 1000 (OK); then received 1000 (OK)
+[2026-08-31 23:32:06,510] [ERROR] [gemini_translator]: [GeminiAPI:SEND_ERROR] Помилка відправки аудіо: sent 1000 (OK); then received 1000 (OK)
+[2026-08-31 23:32:53,293] [ERROR] [gemini_translator]: [GeminiAPI:RECV_ERROR] Помилка прийому аудіопотоку: 1000 None. 
+[2026-08-31 23:32:53,293] [ERROR] [gemini_translator]: [GeminiAPI:RECV_ERROR] Помилка прийому аудіопотоку: 1000 None. 
+[2026-08-31 23:32:54,429] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-08-31 23:32:54,429] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.

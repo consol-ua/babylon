@@ -5,6 +5,8 @@ import {
   fetchVoices,
   startCall,
   stopCall,
+  startDubbing,
+  stopDubbing,
   startSampleTest,
   stopSampleTest,
   startMicTest,
@@ -19,6 +21,7 @@ import {
   MicTestResult,
 } from "./api";
 import { CallView } from "./components/CallView";
+import { DubbingView } from "./components/DubbingView";
 import { TestingView } from "./components/TestingView";
 import { LogConsole } from "./components/LogConsole";
 import {
@@ -29,6 +32,7 @@ import {
   Key,
   Eye,
   EyeOff,
+  Video,
 } from "lucide-react";
 
 export interface LanguageOption {
@@ -56,7 +60,7 @@ export const DEFAULT_VOICES: GeminiVoice[] = [
 ];
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"call" | "testing">("call");
+  const [activeTab, setActiveTab] = useState<"call" | "dubbing" | "testing">("call");
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [samples, setSamples] = useState<SampleInfo[]>([]);
   const [voices, setVoices] = useState<GeminiVoice[]>(DEFAULT_VOICES);
@@ -66,6 +70,7 @@ export const App: React.FC = () => {
   const [partnerLang, setPartnerLang] = useState<string>("en");
   const [outgoingVoice, setOutgoingVoice] = useState<string>("Puck");
   const [incomingVoice, setIncomingVoice] = useState<string>("Aoede");
+  const [dubbingVoice, setDubbingVoice] = useState<string>("Aoede");
   const [sampleVoice, setSampleVoice] = useState<string>("Aoede");
   const [micTestVoice, setMicTestVoice] = useState<string>("Puck");
 
@@ -76,6 +81,7 @@ export const App: React.FC = () => {
   const [myMicIndex, setMyMicIndex] = useState<number | undefined>();
   const [callVirtualMicIndex, setCallVirtualMicIndex] = useState<number | undefined>();
   const [callInputIndex, setCallInputIndex] = useState<number | undefined>();
+  const [dubbingInputIndex, setDubbingInputIndex] = useState<number | undefined>();
   const [headphonesIndex, setHeadphonesIndex] = useState<number | undefined>();
 
   // DSP & Buffering
@@ -85,6 +91,7 @@ export const App: React.FC = () => {
   // Backend Live State
   const [backendState, setBackendState] = useState<DualBackendState>({
     is_call_active: false,
+    is_dubbing_active: false,
     is_testing_active: false,
     is_mic_test_active: false,
     active_sample_id: null,
@@ -119,8 +126,15 @@ export const App: React.FC = () => {
 
         if (defaultMic) setMyMicIndex(defaultMic.index);
         if (blackholeOut) setCallVirtualMicIndex(blackholeOut.index);
-        if (blackholeIn) setCallInputIndex(blackholeIn.index);
-        else if (inputs.length > 1) setCallInputIndex(inputs[1].index);
+        if (blackholeIn) {
+          setCallInputIndex(blackholeIn.index);
+          setDubbingInputIndex(blackholeIn.index);
+        } else if (inputs.length > 1) {
+          setCallInputIndex(inputs[1].index);
+          setDubbingInputIndex(inputs[1].index);
+        } else if (inputs.length > 0) {
+          setDubbingInputIndex(inputs[0].index);
+        }
         if (defaultHeadphones) setHeadphonesIndex(defaultHeadphones.index);
       }
     );
@@ -185,6 +199,38 @@ export const App: React.FC = () => {
     partnerLang,
     outgoingVoice,
     incomingVoice,
+    duckingFactor,
+    jitterBufferMs,
+    apiKey,
+  ]);
+
+  const handleToggleDubbing = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      if (backendState.is_dubbing_active) {
+        await stopDubbing();
+      } else {
+        await startDubbing({
+          input_device_index: dubbingInputIndex,
+          headphones_index: headphonesIndex,
+          source_lang: partnerLang,
+          voice_name: dubbingVoice,
+          ducking_factor: duckingFactor,
+          jitter_buffer_ms: jitterBufferMs,
+          api_key: apiKey || undefined,
+        });
+      }
+    } catch (err) {
+      console.error("[Dubbing Toggle Error]", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    backendState.is_dubbing_active,
+    dubbingInputIndex,
+    headphonesIndex,
+    partnerLang,
+    dubbingVoice,
     duckingFactor,
     jitterBufferMs,
     apiKey,
@@ -274,7 +320,7 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
             <span
               className={`inline-block w-2.5 h-2.5 rounded-full ${
-                backendState.is_call_active
+                backendState.is_call_active || backendState.is_dubbing_active
                   ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
                   : backendState.is_testing_active || backendState.is_mic_test_active
                   ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
@@ -284,6 +330,8 @@ export const App: React.FC = () => {
             <span className="text-xs font-semibold text-slate-300">
               {backendState.is_call_active
                 ? "Дзвінок активний"
+                : backendState.is_dubbing_active
+                ? "Дублювання відео активне"
                 : backendState.is_testing_active
                 ? "Тестування запису"
                 : backendState.is_mic_test_active
@@ -300,12 +348,17 @@ export const App: React.FC = () => {
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
             <Globe className="w-4 h-4 text-indigo-400" />
-            Мова співрозмовника (Ваша мова завжди Українська 🇺🇦)
+            Мова співрозмовника / відео (Ваша мова завжди Українська 🇺🇦)
           </label>
           <select
             value={partnerLang}
             onChange={(e) => setPartnerLang(e.target.value)}
-            disabled={backendState.is_call_active || backendState.is_testing_active || backendState.is_mic_test_active}
+            disabled={
+              backendState.is_call_active ||
+              backendState.is_dubbing_active ||
+              backendState.is_testing_active ||
+              backendState.is_mic_test_active
+            }
             className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-medium"
           >
             {SUPPORTED_LANGUAGES.map((lang) => (
@@ -337,7 +390,12 @@ export const App: React.FC = () => {
             placeholder="Введіть AIzaSy... (або залиште порожнім, якщо є .env)"
             value={apiKey}
             onChange={(e) => handleApiKeyChange(e.target.value)}
-            disabled={backendState.is_call_active || backendState.is_testing_active || backendState.is_mic_test_active}
+            disabled={
+              backendState.is_call_active ||
+              backendState.is_dubbing_active ||
+              backendState.is_testing_active ||
+              backendState.is_mic_test_active
+            }
             className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-mono"
           />
         </div>
@@ -355,6 +413,18 @@ export const App: React.FC = () => {
         >
           <PhoneCall className="w-4 h-4" />
           Синхронний дзвінок (Live Call)
+        </button>
+
+        <button
+          onClick={() => setActiveTab("dubbing")}
+          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-t-lg transition-all ${
+            activeTab === "dubbing"
+              ? "bg-slate-900 text-indigo-400 border-t border-l border-r border-slate-800"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          Дублювання відео (YouTube / Media)
         </button>
 
         <button
@@ -396,6 +466,26 @@ export const App: React.FC = () => {
             state={backendState}
             isLoading={isLoading}
             onToggleCall={handleToggleCall}
+          />
+        ) : activeTab === "dubbing" ? (
+          <DubbingView
+            devices={devices}
+            voices={voices}
+            dubbingInputIndex={dubbingInputIndex}
+            onSelectDubbingInput={setDubbingInputIndex}
+            headphonesIndex={headphonesIndex}
+            onSelectHeadphones={setHeadphonesIndex}
+            sourceLangLabel={partnerLangOption.label}
+            sourceLangCode={partnerLangOption.code}
+            dubbingVoice={dubbingVoice}
+            onSelectDubbingVoice={setDubbingVoice}
+            duckingFactor={duckingFactor}
+            onDuckingChange={handleDuckingChange}
+            jitterBufferMs={jitterBufferMs}
+            onJitterBufferChange={handleJitterBufferChange}
+            state={backendState}
+            isLoading={isLoading}
+            onToggleDubbing={handleToggleDubbing}
           />
         ) : (
           <TestingView

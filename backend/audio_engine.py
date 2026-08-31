@@ -215,6 +215,7 @@ class DualChannelAudioEngine:
 
         # Status flags
         self.is_call_running: bool = False
+        self.is_dubbing_running: bool = False
         self.is_sample_running: bool = False
         self.is_mic_test_running: bool = False
         self.is_incoming_ducking: bool = False
@@ -383,6 +384,51 @@ class DualChannelAudioEngine:
         self._drain_queues()
         self.clear_playback_buffers()
 
+    def start_dubbing(
+        self,
+        input_device_index: Optional[int] = None,
+        headphones_index: Optional[int] = None,
+    ) -> None:
+        if self.is_dubbing_running:
+            return
+
+        self.clear_playback_buffers()
+
+        with self._stream_lock:
+            if input_device_index is not None:
+                self.call_input_stream = self.p.open(
+                    format=self.format_type,
+                    channels=self.channels,
+                    rate=self.rate,
+                    input=True,
+                    input_device_index=input_device_index,
+                    frames_per_buffer=self.chunk_size,
+                )
+
+            self.headphones_stream = self.p.open(
+                format=self.format_type,
+                channels=self.channels,
+                rate=self.rate,
+                output=True,
+                output_device_index=headphones_index,
+                frames_per_buffer=self.chunk_size,
+            )
+
+        self.is_dubbing_running = True
+
+    def stop_dubbing(self) -> None:
+        self.is_dubbing_running = False
+        time.sleep(0.03)
+
+        for stream_attr in [
+            "call_input_stream",
+            "headphones_stream",
+        ]:
+            self._safe_close_stream(stream_attr)
+
+        self._drain_queues()
+        self.clear_playback_buffers()
+
     def start_sample_test(self, headphones_index: Optional[int] = None) -> None:
         if self.is_sample_running:
             return
@@ -533,7 +579,7 @@ class DualChannelAudioEngine:
     async def incoming_process_loop(self) -> None:
         loop = asyncio.get_running_loop()
 
-        while self.is_call_running:
+        while self.is_call_running or self.is_dubbing_running:
             if not self.call_input_stream or not self.headphones_stream:
                 await asyncio.sleep(0.01)
                 continue
@@ -546,7 +592,7 @@ class DualChannelAudioEngine:
                     self.chunk_size,
                 )
 
-                if not raw_call_bytes or not self.is_call_running:
+                if not raw_call_bytes or not (self.is_call_running or self.is_dubbing_running):
                     await asyncio.sleep(0.01)
                     continue
 
@@ -564,7 +610,7 @@ class DualChannelAudioEngine:
                     db = self._calculate_rms_db(call_audio_chunk)
                     self.incoming_telemetry_cb(db, self.is_incoming_ducking)
 
-                if self.headphones_stream and self.is_call_running:
+                if self.headphones_stream and (self.is_call_running or self.is_dubbing_running):
                     await loop.run_in_executor(
                         None,
                         self._safe_write,
@@ -691,6 +737,7 @@ class DualChannelAudioEngine:
     def terminate(self) -> None:
         """Cleanup PyAudio instance."""
         self.stop_call()
+        self.stop_dubbing()
         self.stop_sample_test()
         self.stop_mic_test()
         with self._stream_lock:

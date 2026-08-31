@@ -142,6 +142,15 @@ class SampleStartRequest(BaseModel):
     voice_name: str = "Aoede"
     api_key: Optional[str] = None
 
+class DubbingStartRequest(BaseModel):
+    input_device_index: Optional[int] = None
+    headphones_index: Optional[int] = None
+    source_lang: str = "en"
+    voice_name: str = "Aoede"
+    ducking_factor: float = 0.2
+    jitter_buffer_ms: int = 150
+    api_key: Optional[str] = None
+
 class MicTestStartRequest(BaseModel):
     mic_index: Optional[int] = None
     partner_lang: str = "en"
@@ -157,6 +166,7 @@ class JitterBufferRequest(BaseModel):
 class AppState:
     def __init__(self) -> None:
         self.is_call_active: bool = False
+        self.is_dubbing_active: bool = False
         self.is_testing_active: bool = False
         self.is_mic_test_active: bool = False
         self.active_sample_id: Optional[str] = None
@@ -244,6 +254,7 @@ async def state_broadcast_loop() -> None:
             await manager.broadcast(
                 {
                     "is_call_active": state.is_call_active,
+                    "is_dubbing_active": state.is_dubbing_active,
                     "is_testing_active": state.is_testing_active,
                     "is_mic_test_active": state.is_mic_test_active,
                     "active_sample_id": state.active_sample_id,
@@ -309,6 +320,7 @@ def get_samples():
 
 # Active task tracking for safe async shutdown
 active_call_tasks: Set[asyncio.Task] = set()
+active_dubbing_tasks: Set[asyncio.Task] = set()
 active_sample_tasks: Set[asyncio.Task] = set()
 active_mic_test_tasks: Set[asyncio.Task] = set()
 
@@ -326,7 +338,7 @@ def get_logs():
 
 @app.post("/call/start")
 async def start_call(req: CallStartRequest):
-    if state.is_call_active or state.is_testing_active or state.is_mic_test_active:
+    if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
     state.last_error = None
@@ -391,9 +403,65 @@ async def stop_call():
     add_log_entry("INFO", "Синхронний дзвінок зупинено.", "call")
     return {"status": "call_stopped"}
 
+# Media / YouTube Dubbing Endpoints
+@app.post("/dubbing/start")
+async def start_dubbing(req: DubbingStartRequest):
+    if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
+        return {"status": "already_running"}
+
+    state.last_error = None
+    api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
+    incoming_ai.set_api_key(api_key)
+    incoming_ai.target_lang = "uk"
+    incoming_ai.set_voice(req.voice_name)
+
+    state.partner_lang = req.source_lang
+    state.incoming_voice = req.voice_name
+    state.jitter_buffer_ms = req.jitter_buffer_ms
+
+    audio_engine.set_ducking_factor(req.ducking_factor)
+    audio_engine.set_jitter_buffer_ms(req.jitter_buffer_ms)
+
+    state.incoming_stt = ""
+    state.incoming_translation = ""
+    state.is_dubbing_active = True
+
+    add_log_entry(
+        "INFO",
+        f"Запуск дублювання відео (джерело: {req.source_lang}, голос дубляжу: {req.voice_name}).",
+        "dubbing",
+    )
+
+    try:
+        audio_engine.start_dubbing(
+            input_device_index=req.input_device_index,
+            headphones_index=req.headphones_index,
+        )
+    except Exception as e:
+        err_msg = f"Помилка аудіопристроїв дублювання: {e}"
+        add_log_entry("ERROR", err_msg, "audio")
+        state.last_error = err_msg
+        state.is_dubbing_active = False
+        raise HTTPException(status_code=500, detail=err_msg)
+
+    t1 = asyncio.create_task(audio_engine.incoming_process_loop())
+    t2 = asyncio.create_task(incoming_ai.run(audio_engine.incoming_input_queue))
+    active_dubbing_tasks.update([t1, t2])
+
+    return {"status": "dubbing_started"}
+
+@app.post("/dubbing/stop")
+async def stop_dubbing():
+    state.is_dubbing_active = False
+    incoming_ai.stop()
+    await cancel_tasks(active_dubbing_tasks)
+    audio_engine.stop_dubbing()
+    add_log_entry("INFO", "Дублювання відео зупинено.", "dubbing")
+    return {"status": "dubbing_stopped"}
+
 @app.post("/samples/start")
 async def start_sample_test(req: SampleStartRequest):
-    if state.is_call_active or state.is_testing_active or state.is_mic_test_active:
+    if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
     sample_meta = next((s for s in AVAILABLE_SAMPLES if s["id"] == req.sample_id), None)
@@ -465,7 +533,7 @@ async def stop_sample_test():
 @app.post("/test_mic/start")
 async def start_mic_test_endpoint(req: MicTestStartRequest):
     """Start capturing mic audio, streaming to Gemini, and recording translated speech."""
-    if state.is_call_active or state.is_testing_active or state.is_mic_test_active:
+    if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
     state.last_error = None

@@ -36,6 +36,7 @@ export interface StreamTelemetry {
 
 export interface DualBackendState {
   is_call_active: boolean;
+  is_dubbing_active?: boolean;
   is_testing_active: boolean;
   is_mic_test_active: boolean;
   active_sample_id: string | null;
@@ -58,6 +59,16 @@ export interface CallStartPayload {
   partner_lang: string;
   outgoing_voice: string;
   incoming_voice: string;
+  ducking_factor: number;
+  jitter_buffer_ms: number;
+  api_key?: string;
+}
+
+export interface DubbingStartPayload {
+  input_device_index?: number;
+  headphones_index?: number;
+  source_lang: string;
+  voice_name: string;
   ducking_factor: number;
   jitter_buffer_ms: number;
   api_key?: string;
@@ -158,6 +169,27 @@ export async function stopCall(): Promise<void> {
   });
   if (!res.ok) {
     throw new Error("Failed to stop call");
+  }
+}
+
+export async function startDubbing(payload: DubbingStartPayload): Promise<void> {
+  const res = await fetch(`${API_BASE}/dubbing/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({ detail: "Failed to start dubbing" }));
+    throw new Error(errData.detail || "Failed to start dubbing");
+  }
+}
+
+export async function stopDubbing(): Promise<void> {
+  const res = await fetch(`${API_BASE}/dubbing/stop`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to stop dubbing");
   }
 }
 
