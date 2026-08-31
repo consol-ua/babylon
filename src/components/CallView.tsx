@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { AudioDevice, DualBackendState, GeminiVoice } from "../api";
 import { VuMeter } from "./VuMeter";
 import { TranscriptBox } from "./TranscriptBox";
+import { SetupGuide } from "./SetupGuide";
 import {
   Mic,
   Volume2,
@@ -12,6 +13,7 @@ import {
   PhoneForwarded,
   Sliders,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 
 interface CallViewProps {
@@ -66,8 +68,55 @@ export const CallView: React.FC<CallViewProps> = ({
   const inputDevices = devices.filter((d) => d.max_input_channels > 0);
   const outputDevices = devices.filter((d) => d.max_output_channels > 0);
 
+  const selectedVirtualMic = outputDevices.find((d) => d.index === callVirtualMicIndex);
+  const selectedCallInput = inputDevices.find((d) => d.index === callInputIndex);
+
+  // Detect whether the same virtual driver is used for both outgoing virtual mic and incoming call sound
+  const isLoopbackRisk = useMemo(() => {
+    if (!selectedVirtualMic || !selectedCallInput) return false;
+    const outName = selectedVirtualMic.name.toLowerCase();
+    const inName = selectedCallInput.name.toLowerCase();
+
+    if (outName === inName) return true;
+    if (outName.includes("blackhole 2ch") && inName.includes("blackhole 2ch")) return true;
+    if (outName.includes("blackhole 16ch") && inName.includes("blackhole 16ch")) return true;
+    if (outName.includes("blackhole 64ch") && inName.includes("blackhole 64ch")) return true;
+    if (
+      outName.includes("blackhole") &&
+      inName.includes("blackhole") &&
+      !outName.includes("16ch") &&
+      !inName.includes("16ch") &&
+      !outName.includes("64ch") &&
+      !inName.includes("64ch")
+    ) {
+      return true;
+    }
+    return false;
+  }, [selectedVirtualMic, selectedCallInput]);
+
   return (
     <div className="space-y-6">
+      {/* Interactive Setup Guide */}
+      <SetupGuide />
+
+      {/* Loopback Feedback Conflict Warning */}
+      {isLoopbackRisk && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3 text-rose-200 shadow-sm animate-pulse-subtle">
+          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-xs font-semibold text-rose-300">
+              Увага: Ризик закільцьовування звуку (Loopback Conflict)!
+            </h4>
+            <p className="text-[11px] leading-relaxed text-rose-200/90">
+              Ви обрали однаковий пристрій <strong className="text-rose-100 font-mono">"{selectedVirtualMic?.name}"</strong> одночасно для «Віртуального мікрофона для Zoom» та «Входу звуку із Zoom». У такому режимі переклад вашого власного голосу транслюватиметься вам назад у навушники.
+            </p>
+            <p className="text-[11px] text-rose-300 font-medium pt-0.5">
+              💡 <strong>Як виправити:</strong> встановіть <code className="text-xs bg-rose-950/60 px-1 py-0.5 rounded text-rose-200 font-mono">BlackHole 2ch</code> для мікрофона та <code className="text-xs bg-rose-950/60 px-1 py-0.5 rounded text-rose-200 font-mono">BlackHole 16ch</code> для входу звуку співрозмовника.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 2 Duplex Channels Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Channel 1: Outgoing (Me -> Zoom/Meet) */}

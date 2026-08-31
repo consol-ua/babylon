@@ -68,6 +68,15 @@ class GeminiLiveAudioSession:
         if self.on_error:
             self.on_error(message, error_type)
 
+    @staticmethod
+    def _is_normal_closure(error: Exception) -> bool:
+        """Check if exception represents a graceful WebSocket closure (code 1000/1001)."""
+        err_msg = str(error)
+        return any(
+            phrase in err_msg
+            for phrase in ("1000", "1001", "ConnectionClosedOK", "sent 1000 (OK)")
+        )
+
     async def run(
         self,
         input_queue: asyncio.Queue[bytes],
@@ -118,7 +127,7 @@ class GeminiLiveAudioSession:
                     while self.is_running:
                         try:
                             chunk = await input_queue.get()
-                            if chunk is None:
+                            if chunk is None or not self.is_running:
                                 break
 
                             if self.first_input_audio_time == 0.0:
@@ -133,7 +142,8 @@ class GeminiLiveAudioSession:
                         except asyncio.CancelledError:
                             break
                         except Exception as e:
-                            self._report_error(f"Помилка відправки аудіо: {e}", "SEND_ERROR")
+                            if self.is_running and not self._is_normal_closure(e):
+                                self._report_error(f"Помилка відправки аудіо: {e}", "SEND_ERROR")
                             break
 
                 async def receive_audio_worker() -> None:
@@ -197,7 +207,8 @@ class GeminiLiveAudioSession:
                     except asyncio.CancelledError:
                         pass
                     except Exception as e:
-                        self._report_error(f"Помилка прийому аудіопотоку: {e}", "RECV_ERROR")
+                        if self.is_running and not self._is_normal_closure(e):
+                            self._report_error(f"Помилка прийому аудіопотоку: {e}", "RECV_ERROR")
 
                 send_task = asyncio.create_task(send_audio_worker())
                 recv_task = asyncio.create_task(receive_audio_worker())
@@ -215,20 +226,24 @@ class GeminiLiveAudioSession:
                         pass
 
                 for task in done:
-                    if task.exception() and not isinstance(task.exception(), asyncio.CancelledError):
-                        self._report_error(f"Збій у потоці сесії: {task.exception()}", "WORKER_EXCEPTION")
+                    exc = task.exception()
+                    if exc and not isinstance(exc, asyncio.CancelledError) and self.is_running and not self._is_normal_closure(exc):
+                        self._report_error(f"Збій у потоці сесії: {exc}", "WORKER_EXCEPTION")
 
         except APIError as e:
             msg = f"Помилка Gemini API [{e.code}]: {e.message}"
             self._report_error(msg, "API_ERROR")
         except Exception as e:
-            err_str = str(e)
-            if "403" in err_str or "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
-                self._report_error("Недійсний Gemini API ключ (403/401). Перевірте ключ у налаштуваннях.", "INVALID_KEY")
-            elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                self._report_error("Перевищено ліміт запитів Gemini API (429 Rate Limit Exceeded).", "RATE_LIMIT")
+            if not self.is_running or self._is_normal_closure(e):
+                pass
             else:
-                self._report_error(f"Не вдалося встановити сесію Live Translate: {err_str}", "CONNECT_FAILED")
+                err_str = str(e)
+                if "403" in err_str or "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
+                    self._report_error("Недійсний Gemini API ключ (403/401). Перевірте ключ у налаштуваннях.", "INVALID_KEY")
+                elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    self._report_error("Перевищено ліміт запитів Gemini API (429 Rate Limit Exceeded).", "RATE_LIMIT")
+                else:
+                    self._report_error(f"Не вдалося встановити сесію Live Translate: {err_str}", "CONNECT_FAILED")
         finally:
             self.is_running = False
 

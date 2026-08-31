@@ -119,22 +119,44 @@ export const App: React.FC = () => {
         const inputs = devs.filter((d) => d.max_input_channels > 0);
         const outputs = devs.filter((d) => d.max_output_channels > 0);
 
-        const blackholeIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole"));
-        const blackholeOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole"));
+        // Find physical mic and headphones
         const defaultMic = inputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || inputs[0];
         const defaultHeadphones = outputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || outputs[0];
 
+        // 1. Virtual Mic for Zoom (Out): Prefer BlackHole 2ch, then any BlackHole output
+        const blackhole2chOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole 2ch"));
+        const blackholeGeneralOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole"));
+        const selectedVirtualMic = blackhole2chOut || blackholeGeneralOut;
+
+        // 2. Sound In from Zoom (In): Prefer BlackHole 16ch / 64ch or an input distinct from virtual mic
+        const blackhole16chIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole 16ch"));
+        const blackhole64chIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole 64ch"));
+        const otherVirtualIn = inputs.find(
+          (d) =>
+            d.name.toLowerCase().includes("blackhole") &&
+            d.name.toLowerCase() !== selectedVirtualMic?.name.toLowerCase()
+        );
+        const selectedCallInput = blackhole16chIn || blackhole64chIn || otherVirtualIn;
+
         if (defaultMic) setMyMicIndex(defaultMic.index);
-        if (blackholeOut) setCallVirtualMicIndex(blackholeOut.index);
-        if (blackholeIn) {
-          setCallInputIndex(blackholeIn.index);
-          setDubbingInputIndex(blackholeIn.index);
-        } else if (inputs.length > 1) {
-          setCallInputIndex(inputs[1].index);
-          setDubbingInputIndex(inputs[1].index);
-        } else if (inputs.length > 0) {
-          setDubbingInputIndex(inputs[0].index);
+        if (selectedVirtualMic) setCallVirtualMicIndex(selectedVirtualMic.index);
+        if (selectedCallInput) {
+          setCallInputIndex(selectedCallInput.index);
+        } else {
+          // If only 1 BlackHole is installed, pick non-colliding input if available
+          const secondaryInput = inputs.find(
+            (d) => d.index !== defaultMic?.index && d.name.toLowerCase() !== selectedVirtualMic?.name.toLowerCase()
+          );
+          if (secondaryInput) setCallInputIndex(secondaryInput.index);
         }
+
+        // For Media Dubbing, any BlackHole input works
+        const dubbingIn =
+          inputs.find((d) => d.name.toLowerCase().includes("blackhole 16ch")) ||
+          inputs.find((d) => d.name.toLowerCase().includes("blackhole")) ||
+          inputs[0];
+        if (dubbingIn) setDubbingInputIndex(dubbingIn.index);
+
         if (defaultHeadphones) setHeadphonesIndex(defaultHeadphones.index);
       }
     );

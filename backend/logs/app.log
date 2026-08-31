@@ -142,3 +142,68 @@
 [2026-08-31 23:32:53,293] [ERROR] [gemini_translator]: [GeminiAPI:RECV_ERROR] Помилка прийому аудіопотоку: 1000 None. 
 [2026-08-31 23:32:54,429] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
 [2026-08-31 23:32:54,429] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-08-31 23:36:24,525] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:36:24,878] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:36:24,878] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-08-31 23:38:05,226] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:38:05,226] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:38:26,670] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:38:26,670] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:38:40,759] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:38:40,759] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:38:54,918] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:38:54,918] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:39:19,909] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:39:19,909] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:39:31,582] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:39:31,582] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:39:50,054] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:39:50,054] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:39:55,079] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:39:55,079] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:40:03,126] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:40:03,126] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:40:17,378] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:40:17,378] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:44:05,623] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:44:05,623] [INFO] [gemini_translator]: [call] Запуск дзвінка (мова: es, вихідний голос: Puck, вхідний: Aoede).
+[2026-08-31 23:45:20,373] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:45:20,373] [INFO] [gemini_translator]: [call] Синхронний дзвінок зупинено.
+[2026-08-31 23:54:19,114] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:54:19,114] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:54:21,053] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:54:21,053] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:54:21,158] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:54:21,158] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:54:24,290] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:54:24,290] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-08-31 23:54:52,503] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:54:52,503] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-08-31 23:54:52,607] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:54:52,607] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:54:56,453] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-08-31 23:54:56,453] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-08-31 23:55:20,755] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-08-31 23:55:20,755] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-08-31 23:55:24,712] [INFO] [gemini_translator]: [sample] Запуск семплу 'Casual Small Talk' (голос: Aoede).
+[2026-08-31 23:55:24,712] [INFO] [gemini_translator]: [sample] Запуск семплу 'Casual Small Talk' (голос: Aoede).
+[2026-08-31 23:55:39,195] [INFO] [gemini_translator]: [sample] Відтворення семплу 'Casual Small Talk' завершено (усі фрази озвучено).
+[2026-08-31 23:55:39,195] [INFO] [gemini_translator]: [sample] Відтворення семплу 'Casual Small Talk' завершено (усі фрази озвучено).
+[2026-08-31 23:55:39,300] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:55:39,300] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-08-31 23:55:51,674] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 300 мс.
+[2026-08-31 23:55:51,674] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 300 мс.
+[2026-08-31 23:55:52,454] [INFO] [gemini_translator]: [sample] Запуск семплу 'Casual Small Talk' (голос: Puck).
+[2026-08-31 23:55:52,454] [INFO] [gemini_translator]: [sample] Запуск семплу 'Casual Small Talk' (голос: Puck).
+[2026-08-31 23:56:13,043] [INFO] [gemini_translator]: [sample] Відтворення семплу 'Casual Small Talk' завершено (усі фрази озвучено).
+[2026-08-31 23:56:13,043] [INFO] [gemini_translator]: [sample] Відтворення семплу 'Casual Small Talk' завершено (усі фрази озвучено).
+[2026-08-31 23:57:54,120] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-08-31 23:57:54,120] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-08-31 23:57:55,832] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 225 мс.
+[2026-08-31 23:57:55,832] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 225 мс.
+[2026-08-31 23:57:58,809] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 175 мс.
+[2026-08-31 23:57:58,809] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 175 мс.
+[2026-08-31 23:58:02,147] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Fenrir).
+[2026-08-31 23:58:02,147] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Fenrir).
+[2026-09-01 00:00:07,480] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-01 00:00:07,480] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
