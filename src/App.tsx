@@ -33,7 +33,7 @@ export const App: React.FC = () => {
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
 
   const [duckingFactor, setDuckingFactor] = useState<number>(0.2);
-  const [jitterBufferMs, setJitterBufferMs] = useState<number>(150);
+  const [jitterBufferMs, setJitterBufferMs] = useState<number>(75);
 
   const backendState = useBackendState();
   const audioDevices = useAudioDevices();

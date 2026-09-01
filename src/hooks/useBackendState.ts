@@ -11,7 +11,7 @@ const DEFAULT_STATE: DualBackendState = {
   partner_lang: "en",
   outgoing_voice: "Puck",
   incoming_voice: "Aoede",
-  jitter_buffer_ms: 150,
+  jitter_buffer_ms: 75,
   mic_test_latency_ms: 0,
   last_error: null,
   logs: [],

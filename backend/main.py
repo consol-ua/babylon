@@ -175,7 +175,7 @@ class AppState:
         self.partner_lang: str = "en"
         self.outgoing_voice: str = "Puck"
         self.incoming_voice: str = "Aoede"
-        self.jitter_buffer_ms: int = 150
+        self.jitter_buffer_ms: int = 75
         self.last_error: Optional[str] = None
         self.mic_test_latency_ms: int = 0
 

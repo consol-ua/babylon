@@ -299,17 +299,17 @@ export const DubbingView = React.memo<DubbingViewProps>(({
             </div>
             <input
               type="range"
-              min="50"
-              max="400"
-              step="25"
+              min="40"
+              max="300"
+              step="10"
               value={jitterBufferMs}
               onChange={(e) => onJitterBufferChange(parseInt(e.target.value, 10))}
               className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
             <div className="flex justify-between text-[10px] text-slate-400">
-              <span>50 мс (Мінімальна затримка)</span>
-              <span>150 мс (Баланс)</span>
-              <span>400 мс (Максимальна стабільність)</span>
+              <span>40 мс (Ultra-Low Latency)</span>
+              <span>75 мс (Рекомендовано)</span>
+              <span>300 мс (Максимальна стабільність)</span>
             </div>
           </div>
         </div>

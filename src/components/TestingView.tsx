@@ -418,9 +418,9 @@ export const TestingView = React.memo<TestingViewProps>(({
                   </div>
                   <input
                     type="range"
-                    min="50"
-                    max="400"
-                    step="25"
+                    min="40"
+                    max="300"
+                    step="10"
                     value={jitterBufferMs}
                     onChange={(e) => onJitterBufferChange(parseInt(e.target.value, 10))}
                     className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"

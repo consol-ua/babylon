@@ -19,7 +19,7 @@ class AudioStreamBuffer:
     Preserves 100% of received audio samples without truncating or discarding.
     """
 
-    def __init__(self, sample_rate: int = 16000, jitter_buffer_ms: int = 150) -> None:
+    def __init__(self, sample_rate: int = 16000, jitter_buffer_ms: int = 75) -> None:
         self.sample_rate = sample_rate
         self.jitter_buffer_ms = jitter_buffer_ms
         self._chunks: deque[np.ndarray] = deque()
@@ -30,21 +30,23 @@ class AudioStreamBuffer:
 
     def set_jitter_buffer_ms(self, ms: int) -> None:
         """Update jitter buffer cushion size in milliseconds."""
-        self.jitter_buffer_ms = max(50, min(400, ms))
+        self.jitter_buffer_ms = max(30, min(300, ms))
 
     @property
     def target_buffer_samples(self) -> int:
         return int(self.sample_rate * (self.jitter_buffer_ms / 1000.0))
 
     def push(self, samples: np.ndarray) -> None:
-        """Append incoming samples of any length to the FIFO buffer."""
+        """Append incoming samples to the FIFO buffer."""
         if len(samples) == 0:
             return
         with self._lock:
             self._chunks.append(samples.copy())
             self._total_samples += len(samples)
             self._last_push_time = time.time()
-            if self._is_buffering and self._total_samples >= self.target_buffer_samples:
+            # Fast-start: start playback as soon as minimum cushion (min of target and 40ms) is reached
+            min_cushion = min(self.target_buffer_samples, int(self.sample_rate * 0.04))
+            if self._is_buffering and self._total_samples >= min_cushion:
                 self._is_buffering = False
 
     def pop(self, num_samples: int) -> Optional[np.ndarray]:
@@ -57,7 +59,8 @@ class AudioStreamBuffer:
                 self._is_buffering = True
                 return None
             if self._is_buffering:
-                if self._total_samples >= self.target_buffer_samples or (time.time() - self._last_push_time > 0.25):
+                min_cushion = min(self.target_buffer_samples, int(self.sample_rate * 0.04))
+                if self._total_samples >= min_cushion or (time.time() - self._last_push_time > 0.15):
                     self._is_buffering = False
                 else:
                     return None
@@ -201,7 +204,7 @@ class DualChannelAudioEngine:
         format_type: int = pyaudio.paInt16,
         channels: int = 1,
         rate: int = 16000,
-        chunk_size: int = 1024,
+        chunk_size: int = 512,
     ) -> None:
         self.format_type = format_type
         self.channels = channels
@@ -225,16 +228,22 @@ class DualChannelAudioEngine:
         self.outgoing_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
         self.incoming_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
 
-        # Audio Stream FIFO Buffers for Playback
-        self.outgoing_playback_buffer = AudioStreamBuffer(sample_rate=rate, jitter_buffer_ms=150)
-        self.incoming_playback_buffer = AudioStreamBuffer(sample_rate=rate, jitter_buffer_ms=150)
+        # Audio Stream FIFO Buffers for Playback (Default 75ms low latency with fast-start)
+        self.outgoing_playback_buffer = AudioStreamBuffer(sample_rate=rate, jitter_buffer_ms=75)
+        self.incoming_playback_buffer = AudioStreamBuffer(sample_rate=rate, jitter_buffer_ms=75)
 
         # Mic Test Audio Collector (Recorded translated PCM)
         self.mic_test_recorded_pcm: List[np.ndarray] = []
         self.mic_test_file_path: Path = Path(__file__).parent / "samples" / "mic_test_result.wav"
 
-        # Smart Ducking DSP Engines
-        self.incoming_ducking_dsp = SmartDuckingDSP(sample_rate=rate, ducking_factor=0.2)
+        # Smart Ducking DSP Engines (Fast 25ms attack)
+        self.incoming_ducking_dsp = SmartDuckingDSP(
+            sample_rate=rate,
+            ducking_factor=0.2,
+            attack_ms=25.0,
+            hold_ms=350.0,
+            release_ms=150.0,
+        )
 
         # Status flags
         self.is_call_running: bool = False
@@ -286,16 +295,12 @@ class DualChannelAudioEngine:
         return -100.0
 
     def _safe_read(self, stream: Optional[pyaudio.Stream], chunk_size: int) -> Optional[bytes]:
-        """Safely read audio from PyAudio stream without race conditions or memory crashes on close."""
+        """Safely read audio from PyAudio stream without artificial delay."""
         if stream is None:
             return None
         try:
             if stream.is_stopped() or not stream.is_active():
                 return None
-            # Check available frames before blocking read on macOS CoreAudio
-            available = stream.get_read_available()
-            if available < chunk_size:
-                time.sleep(0.005)
             return stream.read(chunk_size, exception_on_overflow=False)
         except Exception:
             return None

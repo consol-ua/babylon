@@ -80,13 +80,32 @@ class GeminiLiveAudioSession:
             self.on_error(message, error_type)
 
     @staticmethod
-    def _is_normal_closure(error: Exception) -> bool:
-        """Check if exception represents a graceful WebSocket closure (code 1000/1001)."""
+    def _is_normal_closure(error: Optional[Exception]) -> bool:
+        """Check if exception represents a standard WebSocket closure, cancellation, or ping timeout."""
+        if error is None:
+            return True
         err_msg = str(error)
-        return any(
-            phrase in err_msg
-            for phrase in ("1000", "1001", "ConnectionClosedOK", "sent 1000 (OK)")
+        closure_signatures = (
+            "1000",
+            "1001",
+            "1005",
+            "1006",
+            "1011",
+            "ConnectionClosed",
+            "ConnectionClosedOK",
+            "ConnectionClosedError",
+            "keepalive ping timeout",
+            "no close frame received",
+            "sent 1000",
+            "sent 1001",
+            "sent 1006",
+            "sent 1011",
+            "closed session",
+            "Session closed",
+            "Cannot write to closing transport",
+            "CancelledError",
         )
+        return any(phrase in err_msg for phrase in closure_signatures)
 
     async def run(
         self,
@@ -121,6 +140,8 @@ class GeminiLiveAudioSession:
         if self.channel_name == "outgoing":
             system_prompt = (
                 f"You are a dedicated real-time simultaneous voice interpreter translating spoken Ukrainian into {self.target_lang}. "
+                f"Translate immediately and continuously as the user speaks, phrase-by-phrase, with minimal latency. "
+                f"Do not wait for full sentences or long pauses before starting speech synthesis. "
                 f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
                 f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
                 f"Only synthesize accurate speech in {self.target_lang}. Do not produce meta-commentary, explanations, or conversational filler."
@@ -128,6 +149,8 @@ class GeminiLiveAudioSession:
         else:
             system_prompt = (
                 f"You are a dedicated real-time simultaneous voice interpreter translating incoming speech into Ukrainian (uk). "
+                f"Translate immediately and continuously as the speaker speaks, phrase-by-phrase, with minimal latency. "
+                f"Do not wait for full sentences or long pauses before starting speech synthesis. "
                 f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
                 f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
                 f"Only synthesize accurate, fluent speech in Ukrainian. Do not produce meta-commentary, explanations, or conversational filler."
@@ -294,8 +317,9 @@ class GeminiLiveAudioSession:
                             self._report_error(f"Збій у потоці сесії: {exc}", "WORKER_EXCEPTION")
 
         except APIError as e:
-            msg = f"Помилка Gemini API [{e.code}]: {e.message}"
-            self._report_error(msg, "API_ERROR")
+            if self.is_running and not self._is_normal_closure(e):
+                msg = f"Помилка Gemini API [{e.code}]: {e.message}"
+                self._report_error(msg, "API_ERROR")
         except Exception as e:
             if not self.is_running or self._is_normal_closure(e):
                 pass
