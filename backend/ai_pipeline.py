@@ -41,6 +41,8 @@ class GeminiLiveAudioSession:
         self.first_input_audio_time: float = 0.0
         self.first_audio_received_time: float = 0.0
         self.measured_latency_ms: int = 0
+        self._turn_input_times: list[float] = []
+        self._turn_output_times: list[float] = []
 
         # Callbacks for audio, text, telemetry and completion
         self.on_audio_chunk: Optional[Callable[[np.ndarray], None]] = None
@@ -208,12 +210,13 @@ class GeminiLiveAudioSession:
                                         
                                         # Resample 24kHz down to 16kHz
                                         if len(audio_24k) > 0:
-                                            num_samples_16k = int(len(audio_24k) * (16000 / 24000))
-                                            orig_indices = np.linspace(0, len(audio_24k) - 1, len(audio_24k))
-                                            new_indices = np.linspace(0, len(audio_24k) - 1, num_samples_16k)
-                                            audio_16k = np.interp(new_indices, orig_indices, audio_24k).astype(np.int16)
+                                            num_samples_16k = int(len(audio_24k) * 2 / 3)
+                                            indices = np.arange(num_samples_16k) * 1.5
+                                            idx_floor = indices.astype(np.intp)
+                                            idx_floor = np.clip(idx_floor, 0, len(audio_24k) - 2)
+                                            frac = (indices - idx_floor).astype(np.float32)
+                                            audio_16k = ((1.0 - frac) * audio_24k[idx_floor] + frac * audio_24k[idx_floor + 1]).astype(np.int16)
                                             
-                                            # Push complete resampled audio to callback (FIFO buffer)
                                             if self.on_audio_chunk:
                                                 self.on_audio_chunk(audio_16k)
 
@@ -230,6 +233,14 @@ class GeminiLiveAudioSession:
                             # Turn complete
                             if content.turn_complete:
                                 self.is_turn_complete = True
+                                # Update rolling latency if we have timing data
+                                if self.first_input_audio_time > 0 and self.first_audio_received_time > 0:
+                                    self.measured_latency_ms = int(
+                                        (self.first_audio_received_time - self.first_input_audio_time) * 1000
+                                    )
+                                # Reset for next turn
+                                self.first_input_audio_time = 0.0
+                                self.first_audio_received_time = 0.0
                                 if self.on_turn_complete:
                                     self.on_turn_complete()
 
@@ -247,22 +258,40 @@ class GeminiLiveAudioSession:
                 send_task = asyncio.create_task(send_audio_worker())
                 recv_task = asyncio.create_task(receive_audio_worker())
 
-                done, pending = await asyncio.wait(
-                    [send_task, recv_task],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-
-                for task in pending:
-                    task.cancel()
+                # Wait for send to finish (input exhausted), then give recv a drain window
+                try:
+                    await send_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                
+                # Give receiver a grace period to get remaining translated chunks
+                if self.is_running and not recv_task.done():
                     try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
+                        await asyncio.wait_for(recv_task, timeout=5.0)
+                    except asyncio.TimeoutError:
+                        recv_task.cancel()
+                        try:
+                            await recv_task
+                        except asyncio.CancelledError:
+                            pass
+                    except Exception as e:
+                        if not self._is_normal_closure(e):
+                            self._report_error(f"Drain error: {e}", "DRAIN_ERROR")
+                
+                # Cancel if still running
+                for task in [send_task, recv_task]:
+                    if not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
 
-                for task in done:
-                    exc = task.exception()
-                    if exc and not isinstance(exc, asyncio.CancelledError) and self.is_running and not self._is_normal_closure(exc):
-                        self._report_error(f"Збій у потоці сесії: {exc}", "WORKER_EXCEPTION")
+                for task in [send_task, recv_task]:
+                    if task.done():
+                        exc = task.exception()
+                        if exc and not isinstance(exc, asyncio.CancelledError) and self.is_running and not self._is_normal_closure(exc):
+                            self._report_error(f"Збій у потоці сесії: {exc}", "WORKER_EXCEPTION")
 
         except APIError as e:
             msg = f"Помилка Gemini API [{e.code}]: {e.message}"

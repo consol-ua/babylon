@@ -51,7 +51,7 @@ const APP_GUIDES: Record<SupportedApp, AppGuideInfo> = {
 const STORAGE_KEY = "LIVE_CALL_SETUP_GUIDE_OPEN";
 const INSTALL_COMMAND = "brew install blackhole-2ch blackhole-16ch";
 
-export const SetupGuide: React.FC = () => {
+export const SetupGuide = React.memo(() => {
   const [isOpen, setIsOpen] = useState<boolean>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved !== null ? saved === "true" : true;
@@ -310,4 +310,5 @@ export const SetupGuide: React.FC = () => {
       )}
     </div>
   );
-};
+});
+

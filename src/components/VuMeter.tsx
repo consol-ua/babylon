@@ -8,16 +8,19 @@ interface VuMeterProps {
   activeColorClass?: string;
 }
 
-export const VuMeter: React.FC<VuMeterProps> = ({
+const MIN_DB = -60;
+const MAX_DB = 0;
+
+export const VuMeter = React.memo<VuMeterProps>(({
   label,
   volumeDb,
   isDucking = false,
   activeColorClass = "bg-emerald-500",
 }) => {
-  // Normalize dB from [-60, 0] to [0, 100]%
+  // Normalize dB from [MIN_DB, MAX_DB] to [0, 100]%
   const volumePercentage = Math.max(
     0,
-    Math.min(100, ((volumeDb + 60) / 60) * 100)
+    Math.min(100, ((volumeDb - MIN_DB) / (MAX_DB - MIN_DB)) * 100)
   );
 
   return (
@@ -46,4 +49,4 @@ export const VuMeter: React.FC<VuMeterProps> = ({
       )}
     </div>
   );
-};
+});

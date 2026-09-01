@@ -36,8 +36,10 @@ file_handler.setFormatter(
 )
 logger.addHandler(file_handler)
 
+from collections import deque
+
 MAX_IN_MEMORY_LOGS = 150
-in_memory_logs: List[Dict[str, str]] = []
+in_memory_logs: deque[Dict[str, str]] = deque(maxlen=MAX_IN_MEMORY_LOGS)
 
 def add_log_entry(level: str, message: str, source: str = "system") -> None:
     now_str = datetime.now().strftime("%H:%M:%S")
@@ -48,8 +50,6 @@ def add_log_entry(level: str, message: str, source: str = "system") -> None:
         "source": source,
     }
     in_memory_logs.append(entry)
-    if len(in_memory_logs) > MAX_IN_MEMORY_LOGS:
-        in_memory_logs.pop(0)
 
     if level.upper() == "ERROR":
         logger.error(f"[{source}] {message}")
@@ -81,6 +81,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+    # TODO: Restrict origins for production deployment
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -288,37 +289,36 @@ incoming_ai.on_error = on_ai_error
 async def state_broadcast_loop() -> None:
     while True:
         if manager.active_connections:
-            await manager.broadcast(
-                {
-                    "is_call_active": state.is_call_active,
-                    "is_dubbing_active": state.is_dubbing_active,
-                    "is_testing_active": state.is_testing_active,
-                    "is_mic_test_active": state.is_mic_test_active,
-                    "active_sample_id": state.active_sample_id,
-                    "partner_lang": state.partner_lang,
-                    "outgoing_voice": state.outgoing_voice,
-                    "incoming_voice": state.incoming_voice,
-                    "jitter_buffer_ms": state.jitter_buffer_ms,
-                    "mic_test_latency_ms": state.mic_test_latency_ms,
-                    "last_error": state.last_error,
-                    "logs": in_memory_logs[-40:],
-                    "outgoing": {
-                        "stt_text": state.outgoing_stt,
-                        "translated_text": state.outgoing_translation,
-                        "stt_history": state.outgoing_stt_history,
-                        "translated_history": state.outgoing_trans_history,
-                        "volume_db": round(state.outgoing_volume_db, 1),
-                    },
-                    "incoming": {
-                        "stt_text": state.incoming_stt,
-                        "translated_text": state.incoming_translation,
-                        "stt_history": state.incoming_stt_history,
-                        "translated_history": state.incoming_trans_history,
-                        "volume_db": round(state.incoming_volume_db, 1),
-                        "is_ducking": state.is_incoming_ducking,
-                    },
-                }
-            )
+            payload = {
+                "is_call_active": state.is_call_active,
+                "is_dubbing_active": state.is_dubbing_active,
+                "is_testing_active": state.is_testing_active,
+                "is_mic_test_active": state.is_mic_test_active,
+                "active_sample_id": state.active_sample_id,
+                "partner_lang": state.partner_lang,
+                "outgoing_voice": state.outgoing_voice,
+                "incoming_voice": state.incoming_voice,
+                "jitter_buffer_ms": state.jitter_buffer_ms,
+                "mic_test_latency_ms": state.mic_test_latency_ms,
+                "last_error": state.last_error,
+                "logs": list(in_memory_logs)[-40:],
+                "outgoing": {
+                    "stt_text": state.outgoing_stt,
+                    "translated_text": state.outgoing_translation,
+                    "stt_history": state.outgoing_stt_history,
+                    "translated_history": state.outgoing_trans_history,
+                    "volume_db": round(state.outgoing_volume_db, 1),
+                },
+                "incoming": {
+                    "stt_text": state.incoming_stt,
+                    "translated_text": state.incoming_translation,
+                    "stt_history": state.incoming_stt_history,
+                    "translated_history": state.incoming_trans_history,
+                    "volume_db": round(state.incoming_volume_db, 1),
+                    "is_ducking": state.is_incoming_ducking,
+                },
+            }
+            await manager.broadcast(payload)
         await asyncio.sleep(0.05)
 
 # Built-in Samples Metadata
@@ -381,7 +381,7 @@ async def cancel_tasks(task_set: Set[asyncio.Task]) -> None:
 
 @app.get("/logs")
 def get_logs():
-    return {"logs": in_memory_logs}
+    return {"logs": list(in_memory_logs)}
 
 @app.post("/call/start")
 async def start_call(req: CallStartRequest):

@@ -15,27 +15,28 @@ import {
 interface LogConsoleProps {
   logs: LogEntry[];
   lastError: string | null;
-  onClearLogs?: () => void;
 }
 
-export const LogConsole: React.FC<LogConsoleProps> = ({
+export const LogConsole = React.memo<LogConsoleProps>(({
   logs,
   lastError,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [filter, setFilter] = useState<"ALL" | "ERROR" | "WARN" | "INFO">("ALL");
   const [copied, setCopied] = useState<boolean>(false);
-  const [localLogs, setLocalLogs] = useState<LogEntry[]>([]);
+  const [clearedAt, setClearedAt] = useState<string | null>(null);
 
-  // Merge external live logs with local cleared state
   const displayedLogs = useMemo(() => {
-    const source = localLogs.length > 0 ? localLogs : logs;
+    let source = logs;
+    if (clearedAt) {
+      source = logs.filter(l => l.timestamp > clearedAt);
+    }
     if (filter === "ALL") return source;
-    return source.filter((l) => l.level === filter);
-  }, [logs, localLogs, filter]);
+    return source.filter(l => l.level === filter);
+  }, [logs, clearedAt, filter]);
 
   const handleCopyLogs = async () => {
-    const formatted = logs
+    const formatted = displayedLogs
       .map((l) => `[${l.timestamp}] [${l.level}] [${l.source}]: ${l.message}`)
       .join("\n");
     if (!formatted) return;
@@ -49,7 +50,8 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
   };
 
   const handleClear = () => {
-    setLocalLogs([]);
+    const now = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setClearedAt(now);
   };
 
   const errorCount = useMemo(
@@ -164,7 +166,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
 
                 return (
                   <div
-                    key={idx}
+                    key={`${entry.timestamp}-${entry.source}-${idx}`}
                     className="flex items-start gap-2 pt-1 pb-0.5 hover:bg-slate-900/50 px-1.5 rounded transition-colors"
                   >
                     <span className="text-slate-600 shrink-0 select-none">
@@ -191,4 +193,4 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
       </div>
     </div>
   );
-};
+});

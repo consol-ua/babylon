@@ -41,7 +41,7 @@ interface CallViewProps {
   onToggleCall: () => void;
 }
 
-export const CallView: React.FC<CallViewProps> = ({
+export const CallView = React.memo<CallViewProps>(({
   devices,
   voices,
   myMicIndex,
@@ -65,11 +65,11 @@ export const CallView: React.FC<CallViewProps> = ({
   isLoading,
   onToggleCall,
 }) => {
-  const inputDevices = devices.filter((d) => d.max_input_channels > 0);
-  const outputDevices = devices.filter((d) => d.max_output_channels > 0);
+  const inputDevices = useMemo(() => devices.filter((d: AudioDevice) => d.max_input_channels > 0), [devices]);
+  const outputDevices = useMemo(() => devices.filter((d: AudioDevice) => d.max_output_channels > 0), [devices]);
 
-  const selectedVirtualMic = outputDevices.find((d) => d.index === callVirtualMicIndex);
-  const selectedCallInput = inputDevices.find((d) => d.index === callInputIndex);
+  const selectedVirtualMic = useMemo(() => outputDevices.find((d) => d.index === callVirtualMicIndex), [outputDevices, callVirtualMicIndex]);
+  const selectedCallInput = useMemo(() => inputDevices.find((d) => d.index === callInputIndex), [inputDevices, callInputIndex]);
 
   // Detect whether the same virtual driver is used for both outgoing virtual mic and incoming call sound
   const isLoopbackRisk = useMemo(() => {
@@ -410,4 +410,5 @@ export const CallView: React.FC<CallViewProps> = ({
       </div>
     </div>
   );
-};
+});
+

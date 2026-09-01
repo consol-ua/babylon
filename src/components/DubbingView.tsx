@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { AudioDevice, DualBackendState, GeminiVoice } from "../api";
 import { VuMeter } from "./VuMeter";
 import { TranscriptBox } from "./TranscriptBox";
@@ -40,7 +40,7 @@ interface DubbingViewProps {
   onToggleDubbing: () => void;
 }
 
-export const DubbingView: React.FC<DubbingViewProps> = ({
+export const DubbingView = React.memo<DubbingViewProps>(({
   devices,
   voices,
   dubbingInputIndex,
@@ -60,8 +60,8 @@ export const DubbingView: React.FC<DubbingViewProps> = ({
   onToggleDubbing,
 }) => {
   const [showSetupGuide, setShowSetupGuide] = useState<boolean>(false);
-  const inputDevices = devices.filter((d) => d.max_input_channels > 0);
-  const outputDevices = devices.filter((d) => d.max_output_channels > 0);
+  const inputDevices = useMemo(() => devices.filter((d: AudioDevice) => d.max_input_channels > 0), [devices]);
+  const outputDevices = useMemo(() => devices.filter((d: AudioDevice) => d.max_output_channels > 0), [devices]);
 
   const isDubbing = Boolean(state.is_dubbing_active);
   const isAnyOtherActive =
@@ -406,4 +406,5 @@ export const DubbingView: React.FC<DubbingViewProps> = ({
       </div>
     </div>
   );
-};
+});
+

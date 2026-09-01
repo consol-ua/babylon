@@ -1,25 +1,8 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import {
-  fetchAudioDevices,
-  fetchSamples,
-  fetchVoices,
-  startCall,
-  stopCall,
-  startDubbing,
-  stopDubbing,
-  startSampleTest,
-  stopSampleTest,
-  startMicTest,
-  stopMicTest,
-  updateDuckingFactor,
-  updateJitterBuffer,
-  subscribeToState,
-  AudioDevice,
-  SampleInfo,
-  GeminiVoice,
-  DualBackendState,
-  MicTestResult,
-} from "./api";
+import React, { useState, useMemo } from "react";
+import { useBackendState } from "./hooks/useBackendState";
+import { useAudioDevices } from "./hooks/useAudioDevices";
+import { useSessionControls } from "./hooks/useSessionControls";
+import { SUPPORTED_LANGUAGES } from "./constants";
 import { CallView } from "./components/CallView";
 import { DubbingView } from "./components/DubbingView";
 import { TestingView } from "./components/TestingView";
@@ -35,288 +18,31 @@ import {
   Video,
 } from "lucide-react";
 
-export interface LanguageOption {
-  code: string;
-  label: string;
-}
-
-export const SUPPORTED_LANGUAGES: LanguageOption[] = [
-  { code: "en", label: "English (Англійська)" },
-  { code: "de", label: "German (Німецька)" },
-  { code: "pl", label: "Polish (Польська)" },
-  { code: "es", label: "Spanish (Іспанська)" },
-  { code: "fr", label: "French (Французька)" },
-  { code: "it", label: "Italian (Італійська)" },
-  { code: "ja", label: "Japanese (Японська)" },
-  { code: "zh", label: "Chinese (Китайська)" },
-];
-
-export const DEFAULT_VOICES: GeminiVoice[] = [
-  { id: "Puck", label: "Puck (Чоловічий / Енергійний, природний)", gender: "male" },
-  { id: "Charon", label: "Charon (Чоловічий / Впевнений, спокійний)", gender: "male" },
-  { id: "Fenrir", label: "Fenrir (Чоловічий / Низький тембр)", gender: "male" },
-  { id: "Aoede", label: "Aoede (Жіночий / Виразний, глибокий)", gender: "female" },
-  { id: "Kore", label: "Kore (Жіночий / Спокійний, м'який)", gender: "female" },
-];
-
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"call" | "dubbing" | "testing">("call");
-  const [devices, setDevices] = useState<AudioDevice[]>([]);
-  const [samples, setSamples] = useState<SampleInfo[]>([]);
-  const [voices, setVoices] = useState<GeminiVoice[]>(DEFAULT_VOICES);
-  const [selectedSampleId, setSelectedSampleId] = useState<string>("it_standup");
-
-  // Language, Voices & API Key
+  
   const [partnerLang, setPartnerLang] = useState<string>("en");
   const [outgoingVoice, setOutgoingVoice] = useState<string>("Puck");
   const [incomingVoice, setIncomingVoice] = useState<string>("Aoede");
   const [dubbingVoice, setDubbingVoice] = useState<string>("Aoede");
   const [sampleVoice, setSampleVoice] = useState<string>("Aoede");
   const [micTestVoice, setMicTestVoice] = useState<string>("Puck");
+  const [selectedSampleId, setSelectedSampleId] = useState<string>("it_standup");
 
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem("GEMINI_API_KEY") || "");
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
 
-  // Audio Device Routing
-  const [myMicIndex, setMyMicIndex] = useState<number | undefined>();
-  const [callVirtualMicIndex, setCallVirtualMicIndex] = useState<number | undefined>();
-  const [callInputIndex, setCallInputIndex] = useState<number | undefined>();
-  const [dubbingInputIndex, setDubbingInputIndex] = useState<number | undefined>();
-  const [headphonesIndex, setHeadphonesIndex] = useState<number | undefined>();
-
-  // DSP & Buffering
   const [duckingFactor, setDuckingFactor] = useState<number>(0.2);
   const [jitterBufferMs, setJitterBufferMs] = useState<number>(150);
 
-  // Backend Live State
-  const [backendState, setBackendState] = useState<DualBackendState>({
-    is_call_active: false,
-    is_dubbing_active: false,
-    is_testing_active: false,
-    is_mic_test_active: false,
-    active_sample_id: null,
-    partner_lang: "en",
-    outgoing_voice: "Puck",
-    incoming_voice: "Aoede",
-    jitter_buffer_ms: 150,
-    mic_test_latency_ms: 0,
-    last_error: null,
-    logs: [],
-    outgoing: { stt_text: "", translated_text: "", volume_db: -100 },
-    incoming: { stt_text: "", translated_text: "", volume_db: -100, is_ducking: false },
-  });
-
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Initialize Devices, Samples, and Voices
-  useEffect(() => {
-    Promise.all([fetchAudioDevices(), fetchSamples(), fetchVoices()]).then(
-      ([devs, smps, vcs]) => {
-        setDevices(devs);
-        setSamples(smps);
-        if (vcs.length > 0) setVoices(vcs);
-
-        const inputs = devs.filter((d) => d.max_input_channels > 0);
-        const outputs = devs.filter((d) => d.max_output_channels > 0);
-
-        // Find physical mic and headphones
-        const defaultMic = inputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || inputs[0];
-        const defaultHeadphones = outputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || outputs[0];
-
-        // 1. Virtual Mic for Zoom (Out): Prefer BlackHole 2ch, then any BlackHole output
-        const blackhole2chOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole 2ch"));
-        const blackholeGeneralOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole"));
-        const selectedVirtualMic = blackhole2chOut || blackholeGeneralOut;
-
-        // 2. Sound In from Zoom (In): Prefer BlackHole 16ch / 64ch or an input distinct from virtual mic
-        const blackhole16chIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole 16ch"));
-        const blackhole64chIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole 64ch"));
-        const otherVirtualIn = inputs.find(
-          (d) =>
-            d.name.toLowerCase().includes("blackhole") &&
-            d.name.toLowerCase() !== selectedVirtualMic?.name.toLowerCase()
-        );
-        const selectedCallInput = blackhole16chIn || blackhole64chIn || otherVirtualIn;
-
-        if (defaultMic) setMyMicIndex(defaultMic.index);
-        if (selectedVirtualMic) setCallVirtualMicIndex(selectedVirtualMic.index);
-        if (selectedCallInput) {
-          setCallInputIndex(selectedCallInput.index);
-        } else {
-          // If only 1 BlackHole is installed, pick non-colliding input if available
-          const secondaryInput = inputs.find(
-            (d) => d.index !== defaultMic?.index && d.name.toLowerCase() !== selectedVirtualMic?.name.toLowerCase()
-          );
-          if (secondaryInput) setCallInputIndex(secondaryInput.index);
-        }
-
-        // For Media Dubbing, any BlackHole input works
-        const dubbingIn =
-          inputs.find((d) => d.name.toLowerCase().includes("blackhole 16ch")) ||
-          inputs.find((d) => d.name.toLowerCase().includes("blackhole")) ||
-          inputs[0];
-        if (dubbingIn) setDubbingInputIndex(dubbingIn.index);
-
-        if (defaultHeadphones) setHeadphonesIndex(defaultHeadphones.index);
-      }
-    );
-
-    const unsubscribe = subscribeToState((newState) => {
-      setBackendState(newState);
-      if (newState.jitter_buffer_ms && newState.jitter_buffer_ms !== jitterBufferMs) {
-        setJitterBufferMs(newState.jitter_buffer_ms);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+  const backendState = useBackendState();
+  const audioDevices = useAudioDevices();
+  const sessionControls = useSessionControls(setDuckingFactor, setJitterBufferMs);
 
   const handleApiKeyChange = (val: string) => {
     setApiKey(val);
     localStorage.setItem("GEMINI_API_KEY", val);
   };
-
-  const handleDuckingChange = useCallback(async (val: number) => {
-    setDuckingFactor(val);
-    await updateDuckingFactor(val);
-  }, []);
-
-  const handleJitterBufferChange = useCallback(async (val: number) => {
-    setJitterBufferMs(val);
-    await updateJitterBuffer(val);
-  }, []);
-
-  const handleToggleCall = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      if (backendState.is_call_active) {
-        await stopCall();
-      } else {
-        await startCall({
-          my_mic_index: myMicIndex,
-          call_virtual_mic_index: callVirtualMicIndex,
-          call_input_index: callInputIndex,
-          headphones_index: headphonesIndex,
-          partner_lang: partnerLang,
-          outgoing_voice: outgoingVoice,
-          incoming_voice: incomingVoice,
-          ducking_factor: duckingFactor,
-          jitter_buffer_ms: jitterBufferMs,
-          api_key: apiKey || undefined,
-        });
-      }
-    } catch (err) {
-      console.error("[Call Toggle Error]", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    backendState.is_call_active,
-    myMicIndex,
-    callVirtualMicIndex,
-    callInputIndex,
-    headphonesIndex,
-    partnerLang,
-    outgoingVoice,
-    incomingVoice,
-    duckingFactor,
-    jitterBufferMs,
-    apiKey,
-  ]);
-
-  const handleToggleDubbing = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      if (backendState.is_dubbing_active) {
-        await stopDubbing();
-      } else {
-        await startDubbing({
-          input_device_index: dubbingInputIndex,
-          headphones_index: headphonesIndex,
-          source_lang: partnerLang,
-          voice_name: dubbingVoice,
-          ducking_factor: duckingFactor,
-          jitter_buffer_ms: jitterBufferMs,
-          api_key: apiKey || undefined,
-        });
-      }
-    } catch (err) {
-      console.error("[Dubbing Toggle Error]", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    backendState.is_dubbing_active,
-    dubbingInputIndex,
-    headphonesIndex,
-    partnerLang,
-    dubbingVoice,
-    duckingFactor,
-    jitterBufferMs,
-    apiKey,
-  ]);
-
-  const handleToggleSampleTest = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      if (backendState.is_testing_active) {
-        await stopSampleTest();
-      } else {
-        await startSampleTest({
-          sample_id: selectedSampleId,
-          headphones_index: headphonesIndex,
-          partner_lang: partnerLang,
-          voice_name: sampleVoice,
-          ducking_factor: duckingFactor,
-          jitter_buffer_ms: jitterBufferMs,
-          api_key: apiKey || undefined,
-        });
-      }
-    } catch (err) {
-      console.error("[Sample Toggle Error]", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    backendState.is_testing_active,
-    selectedSampleId,
-    headphonesIndex,
-    partnerLang,
-    sampleVoice,
-    duckingFactor,
-    jitterBufferMs,
-    apiKey,
-  ]);
-
-  const handleStartMicTest = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await startMicTest({
-        mic_index: myMicIndex,
-        partner_lang: partnerLang,
-        voice_name: micTestVoice,
-        api_key: apiKey || undefined,
-      });
-    } catch (err) {
-      console.error("[Mic Test Start Error]", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [myMicIndex, partnerLang, micTestVoice, apiKey]);
-
-  const handleStopMicTest = useCallback(async (): Promise<MicTestResult | undefined> => {
-    setIsLoading(true);
-    try {
-      return await stopMicTest();
-    } catch (err) {
-      console.error("[Mic Test Stop Error]", err);
-      return undefined;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   const partnerLangOption = useMemo(
     () => SUPPORTED_LANGUAGES.find((l) => l.code === partnerLang) || SUPPORTED_LANGUAGES[0],
@@ -466,74 +192,106 @@ export const App: React.FC = () => {
       <main className="space-y-6">
         {activeTab === "call" ? (
           <CallView
-            devices={devices}
-            voices={voices}
-            myMicIndex={myMicIndex}
-            onSelectMyMic={setMyMicIndex}
-            callVirtualMicIndex={callVirtualMicIndex}
-            onSelectCallVirtualMic={setCallVirtualMicIndex}
-            callInputIndex={callInputIndex}
-            onSelectCallInput={setCallInputIndex}
-            headphonesIndex={headphonesIndex}
-            onSelectHeadphones={setHeadphonesIndex}
+            devices={audioDevices.devices}
+            voices={audioDevices.voices}
+            myMicIndex={audioDevices.myMicIndex}
+            onSelectMyMic={audioDevices.setMyMicIndex}
+            callVirtualMicIndex={audioDevices.callVirtualMicIndex}
+            onSelectCallVirtualMic={audioDevices.setCallVirtualMicIndex}
+            callInputIndex={audioDevices.callInputIndex}
+            onSelectCallInput={audioDevices.setCallInputIndex}
+            headphonesIndex={audioDevices.headphonesIndex}
+            onSelectHeadphones={audioDevices.setHeadphonesIndex}
             partnerLangLabel={partnerLangOption.label}
             outgoingVoice={outgoingVoice}
             onSelectOutgoingVoice={setOutgoingVoice}
             incomingVoice={incomingVoice}
             onSelectIncomingVoice={setIncomingVoice}
             duckingFactor={duckingFactor}
-            onDuckingChange={handleDuckingChange}
+            onDuckingChange={sessionControls.handleDuckingChange}
             jitterBufferMs={jitterBufferMs}
-            onJitterBufferChange={handleJitterBufferChange}
+            onJitterBufferChange={sessionControls.handleJitterBufferChange}
             state={backendState}
-            isLoading={isLoading}
-            onToggleCall={handleToggleCall}
+            isLoading={sessionControls.isLoading}
+            onToggleCall={() => sessionControls.handleToggleCall({
+              my_mic_index: audioDevices.myMicIndex,
+              call_virtual_mic_index: audioDevices.callVirtualMicIndex,
+              call_input_index: audioDevices.callInputIndex,
+              headphones_index: audioDevices.headphonesIndex,
+              partner_lang: partnerLang,
+              outgoing_voice: outgoingVoice,
+              incoming_voice: incomingVoice,
+              ducking_factor: duckingFactor,
+              jitter_buffer_ms: jitterBufferMs,
+              api_key: apiKey || undefined,
+            })}
           />
         ) : activeTab === "dubbing" ? (
           <DubbingView
-            devices={devices}
-            voices={voices}
-            dubbingInputIndex={dubbingInputIndex}
-            onSelectDubbingInput={setDubbingInputIndex}
-            headphonesIndex={headphonesIndex}
-            onSelectHeadphones={setHeadphonesIndex}
+            devices={audioDevices.devices}
+            voices={audioDevices.voices}
+            dubbingInputIndex={audioDevices.dubbingInputIndex}
+            onSelectDubbingInput={audioDevices.setDubbingInputIndex}
+            headphonesIndex={audioDevices.headphonesIndex}
+            onSelectHeadphones={audioDevices.setHeadphonesIndex}
             sourceLangLabel={partnerLangOption.label}
             sourceLangCode={partnerLangOption.code}
             dubbingVoice={dubbingVoice}
             onSelectDubbingVoice={setDubbingVoice}
             duckingFactor={duckingFactor}
-            onDuckingChange={handleDuckingChange}
+            onDuckingChange={sessionControls.handleDuckingChange}
             jitterBufferMs={jitterBufferMs}
-            onJitterBufferChange={handleJitterBufferChange}
+            onJitterBufferChange={sessionControls.handleJitterBufferChange}
             state={backendState}
-            isLoading={isLoading}
-            onToggleDubbing={handleToggleDubbing}
+            isLoading={sessionControls.isLoading}
+            onToggleDubbing={() => sessionControls.handleToggleDubbing({
+              input_device_index: audioDevices.dubbingInputIndex,
+              headphones_index: audioDevices.headphonesIndex,
+              source_lang: partnerLang,
+              voice_name: dubbingVoice,
+              ducking_factor: duckingFactor,
+              jitter_buffer_ms: jitterBufferMs,
+              api_key: apiKey || undefined,
+            })}
           />
         ) : (
           <TestingView
-            samples={samples}
-            voices={voices}
+            samples={audioDevices.samples}
+            voices={audioDevices.voices}
             selectedSampleId={selectedSampleId}
             onSelectSample={setSelectedSampleId}
-            devices={devices}
-            myMicIndex={myMicIndex}
-            onSelectMyMic={setMyMicIndex}
-            headphonesIndex={headphonesIndex}
-            onSelectHeadphones={setHeadphonesIndex}
+            devices={audioDevices.devices}
+            myMicIndex={audioDevices.myMicIndex}
+            onSelectMyMic={audioDevices.setMyMicIndex}
+            headphonesIndex={audioDevices.headphonesIndex}
+            onSelectHeadphones={audioDevices.setHeadphonesIndex}
             partnerLangLabel={partnerLangOption.label}
             sampleVoice={sampleVoice}
             onSelectSampleVoice={setSampleVoice}
             micTestVoice={micTestVoice}
             onSelectMicTestVoice={setMicTestVoice}
             duckingFactor={duckingFactor}
-            onDuckingChange={handleDuckingChange}
+            onDuckingChange={sessionControls.handleDuckingChange}
             jitterBufferMs={jitterBufferMs}
-            onJitterBufferChange={handleJitterBufferChange}
+            onJitterBufferChange={sessionControls.handleJitterBufferChange}
             state={backendState}
-            isLoading={isLoading}
-            onToggleSampleTest={handleToggleSampleTest}
-            onStartMicTest={handleStartMicTest}
-            onStopMicTest={handleStopMicTest}
+            isLoading={sessionControls.isLoading}
+            onToggleSampleTest={() => sessionControls.handleToggleSampleTest({
+              sample_id: selectedSampleId,
+              headphones_index: audioDevices.headphonesIndex,
+              partner_lang: partnerLang,
+              voice_name: sampleVoice,
+              ducking_factor: duckingFactor,
+              jitter_buffer_ms: jitterBufferMs,
+              api_key: apiKey || undefined,
+            })}
+            onStartMicTest={() => sessionControls.handleStartMicTest({
+              mic_index: audioDevices.myMicIndex,
+              partner_lang: partnerLang,
+              voice_name: micTestVoice,
+              api_key: apiKey || undefined,
+            })}
+            onStopMicTest={sessionControls.handleStopMicTest}
           />
         )}
 

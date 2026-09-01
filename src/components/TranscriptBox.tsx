@@ -13,7 +13,23 @@ interface TranscriptBoxProps {
 
 type FontSize = "sm" | "base" | "lg" | "xl";
 
-export const TranscriptBox: React.FC<TranscriptBoxProps> = ({
+const COLOR_STYLES = {
+  indigo: "text-indigo-400 border-indigo-900/40",
+  emerald: "text-emerald-400 border-emerald-900/40",
+  amber: "text-amber-400 border-amber-900/40",
+  sky: "text-sky-400 border-sky-900/40",
+};
+
+const FONT_SIZE_CLASSES: Record<FontSize, string> = {
+  sm: "text-xs md:text-sm leading-relaxed",
+  base: "text-sm md:text-base leading-relaxed",
+  lg: "text-base md:text-lg leading-relaxed",
+  xl: "text-lg md:text-xl leading-relaxed",
+};
+
+const FONT_SIZES: FontSize[] = ["sm", "base", "lg", "xl"];
+
+export const TranscriptBox = React.memo<TranscriptBoxProps>(({
   title,
   text,
   history = [],
@@ -27,33 +43,17 @@ export const TranscriptBox: React.FC<TranscriptBoxProps> = ({
   const [fontSize, setFontSize] = useState<FontSize>("base");
   const historyEndRef = useRef<HTMLDivElement>(null);
 
-  const colorStyles = {
-    indigo: "text-indigo-400 border-indigo-900/40",
-    emerald: "text-emerald-400 border-emerald-900/40",
-    amber: "text-amber-400 border-amber-900/40",
-    sky: "text-sky-400 border-sky-900/40",
-  };
-
-  const fontSizeClasses: Record<FontSize, string> = {
-    sm: "text-xs md:text-sm leading-relaxed",
-    base: "text-sm md:text-base leading-relaxed",
-    lg: "text-base md:text-lg leading-relaxed",
-    xl: "text-lg md:text-xl leading-relaxed",
-  };
-
-  const fontSizes: FontSize[] = ["sm", "base", "lg", "xl"];
-
   const handleDecreaseFont = () => {
-    const currentIndex = fontSizes.indexOf(fontSize);
+    const currentIndex = FONT_SIZES.indexOf(fontSize);
     if (currentIndex > 0) {
-      setFontSize(fontSizes[currentIndex - 1]);
+      setFontSize(FONT_SIZES[currentIndex - 1]);
     }
   };
 
   const handleIncreaseFont = () => {
-    const currentIndex = fontSizes.indexOf(fontSize);
-    if (currentIndex < fontSizes.length - 1) {
-      setFontSize(fontSizes[currentIndex + 1]);
+    const currentIndex = FONT_SIZES.indexOf(fontSize);
+    if (currentIndex < FONT_SIZES.length - 1) {
+      setFontSize(FONT_SIZES[currentIndex + 1]);
     }
   };
 
@@ -128,7 +128,7 @@ export const TranscriptBox: React.FC<TranscriptBoxProps> = ({
         {/* Header Bar */}
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
-            <span className={`text-[11px] font-semibold uppercase tracking-wide ${colorStyles[themeColor]}`}>
+            <span className={`text-[11px] font-semibold uppercase tracking-wide ${COLOR_STYLES[themeColor]}`}>
               {title}
             </span>
             {text && (
@@ -289,7 +289,7 @@ export const TranscriptBox: React.FC<TranscriptBoxProps> = ({
             </div>
 
             {/* Modal Body: Book / Article Reader View */}
-            <div className={`flex-1 overflow-y-auto p-6 md:p-8 space-y-4 bg-slate-950/70 ${fontSizeClasses[fontSize]} font-sans selection:bg-indigo-500/30`}>
+            <div className={`flex-1 overflow-y-auto p-6 md:p-8 space-y-4 bg-slate-950/70 ${FONT_SIZE_CLASSES[fontSize]} font-sans selection:bg-indigo-500/30`}>
               {paragraphs.length > 0 ? (
                 <>
                   {paragraphs.map((pText, idx) => (
@@ -338,4 +338,9 @@ export const TranscriptBox: React.FC<TranscriptBoxProps> = ({
       )}
     </>
   );
-};
+}, (prev, next) => {
+  return prev.text === next.text && 
+         prev.history?.length === next.history?.length &&
+         prev.title === next.title &&
+         prev.themeColor === next.themeColor;
+});

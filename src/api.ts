@@ -109,8 +109,7 @@ export interface MicTestResult {
   has_audio: boolean;
 }
 
-const API_BASE = "http://127.0.0.1:8000";
-const WS_URL = "ws://127.0.0.1:8000/ws";
+import { API_BASE } from './constants';
 
 export async function fetchAudioDevices(): Promise<AudioDevice[]> {
   try {
@@ -144,18 +143,6 @@ export async function fetchSamples(): Promise<SampleInfo[]> {
     return data.samples;
   } catch (err) {
     console.error("[API] fetchSamples error:", err);
-    return [];
-  }
-}
-
-export async function fetchLogs(): Promise<LogEntry[]> {
-  try {
-    const res = await fetch(`${API_BASE}/logs`);
-    if (!res.ok) throw new Error("Failed to fetch logs");
-    const data = await res.json();
-    return data.logs;
-  } catch (err) {
-    console.error("[API] fetchLogs error:", err);
     return [];
   }
 }
@@ -246,56 +233,19 @@ export async function stopMicTest(): Promise<MicTestResult> {
 }
 
 export async function updateDuckingFactor(ducking_factor: number): Promise<void> {
-  await fetch(`${API_BASE}/ducking`, {
+  const res = await fetch(`${API_BASE}/ducking`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ducking_factor }),
   });
+  if (!res.ok) throw new Error("Failed to update ducking factor");
 }
 
 export async function updateJitterBuffer(jitter_buffer_ms: number): Promise<void> {
-  await fetch(`${API_BASE}/jitter_buffer`, {
+  const res = await fetch(`${API_BASE}/jitter_buffer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jitter_buffer_ms }),
   });
-}
-
-export function subscribeToState(
-  onState: (state: DualBackendState) => void
-): () => void {
-  let ws: WebSocket | null = null;
-  let isClosing = false;
-  let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const connect = () => {
-    ws = new WebSocket(WS_URL);
-
-    ws.onmessage = (event) => {
-      try {
-        const data: DualBackendState = JSON.parse(event.data);
-        onState(data);
-      } catch (err) {
-        console.error("[WS] Parse error:", err);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.warn("[WS] Connection error:", err);
-    };
-
-    ws.onclose = () => {
-      if (!isClosing) {
-        retryTimer = setTimeout(connect, 1500);
-      }
-    };
-  };
-
-  connect();
-
-  return () => {
-    isClosing = true;
-    if (retryTimer) clearTimeout(retryTimer);
-    if (ws) ws.close();
-  };
+  if (!res.ok) throw new Error("Failed to update jitter buffer");
 }

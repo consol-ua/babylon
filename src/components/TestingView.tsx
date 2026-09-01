@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   AudioDevice,
   DualBackendState,
@@ -53,7 +53,7 @@ interface TestingViewProps {
   onStopMicTest: () => Promise<MicTestResult | undefined>;
 }
 
-export const TestingView: React.FC<TestingViewProps> = ({
+export const TestingView = React.memo<TestingViewProps>(({
   samples,
   voices,
   selectedSampleId,
@@ -86,7 +86,7 @@ export const TestingView: React.FC<TestingViewProps> = ({
   const [isTranscriptOpen, setIsTranscriptOpen] = useState<boolean>(false);
   const [copiedField, setCopiedField] = useState<"original" | "translated" | null>(null);
 
-  const selectedSample = samples.find((s) => s.id === selectedSampleId);
+  const selectedSample = useMemo(() => samples.find((s) => s.id === selectedSampleId), [samples, selectedSampleId]);
 
   const handleCopyText = async (text: string | undefined, field: "original" | "translated") => {
     if (!text) return;
@@ -99,8 +99,8 @@ export const TestingView: React.FC<TestingViewProps> = ({
     }
   };
 
-  const inputDevices = devices.filter((d) => d.max_input_channels > 0);
-  const outputDevices = devices.filter((d) => d.max_output_channels > 0);
+  const inputDevices = useMemo(() => devices.filter((d: AudioDevice) => d.max_input_channels > 0), [devices]);
+  const outputDevices = useMemo(() => devices.filter((d: AudioDevice) => d.max_output_channels > 0), [devices]);
 
   // Timer during mic test
   useEffect(() => {
@@ -643,4 +643,5 @@ export const TestingView: React.FC<TestingViewProps> = ({
       )}
     </div>
   );
-};
+});
+

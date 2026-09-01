@@ -9,6 +9,9 @@ import pyaudio
 from typing import List, Dict, Optional, Callable
 import threading
 
+import threading
+from collections import deque
+
 
 class AudioStreamBuffer:
     """
@@ -19,9 +22,11 @@ class AudioStreamBuffer:
     def __init__(self, sample_rate: int = 16000, jitter_buffer_ms: int = 150) -> None:
         self.sample_rate = sample_rate
         self.jitter_buffer_ms = jitter_buffer_ms
-        self._buffer = np.array([], dtype=np.int16)
-        self._is_buffering = True
-        self._last_push_time = 0.0
+        self._chunks: deque[np.ndarray] = deque()
+        self._total_samples: int = 0
+        self._is_buffering: bool = True
+        self._last_push_time: float = 0.0
+        self._lock = threading.Lock()
 
     def set_jitter_buffer_ms(self, ms: int) -> None:
         """Update jitter buffer cushion size in milliseconds."""
@@ -35,48 +40,58 @@ class AudioStreamBuffer:
         """Append incoming samples of any length to the FIFO buffer."""
         if len(samples) == 0:
             return
-        if len(self._buffer) == 0 and self._is_buffering:
-            self._is_buffering = True
-
-        self._buffer = np.concatenate((self._buffer, samples))
-        self._last_push_time = time.time()
-
-        if self._is_buffering and len(self._buffer) >= self.target_buffer_samples:
-            self._is_buffering = False
+        with self._lock:
+            self._chunks.append(samples.copy())
+            self._total_samples += len(samples)
+            self._last_push_time = time.time()
+            if self._is_buffering and self._total_samples >= self.target_buffer_samples:
+                self._is_buffering = False
 
     def pop(self, num_samples: int) -> Optional[np.ndarray]:
         """
         Extract exactly num_samples for output playback.
         Returns None if buffering or empty.
         """
-        if len(self._buffer) == 0:
-            self._is_buffering = True
-            return None
-
-        if self._is_buffering:
-            if len(self._buffer) >= self.target_buffer_samples or (time.time() - self._last_push_time > 0.25):
-                self._is_buffering = False
-            else:
+        with self._lock:
+            if self._total_samples == 0:
+                self._is_buffering = True
                 return None
-
-        if len(self._buffer) >= num_samples:
-            chunk = self._buffer[:num_samples]
-            self._buffer = self._buffer[num_samples:]
-            return chunk
-        else:
-            # Drain remaining samples
-            chunk = np.pad(self._buffer, (0, num_samples - len(self._buffer)))
-            self._buffer = np.array([], dtype=np.int16)
-            self._is_buffering = True
-            return chunk
+            if self._is_buffering:
+                if self._total_samples >= self.target_buffer_samples or (time.time() - self._last_push_time > 0.25):
+                    self._is_buffering = False
+                else:
+                    return None
+            # Flatten needed chunks
+            result = np.array([], dtype=np.int16)
+            while len(result) < num_samples and self._chunks:
+                chunk = self._chunks.popleft()
+                result = np.concatenate((result, chunk))
+            
+            self._total_samples = sum(len(c) for c in self._chunks)
+            
+            if len(result) >= num_samples:
+                output = result[:num_samples]
+                leftover = result[num_samples:]
+                if len(leftover) > 0:
+                    self._chunks.appendleft(leftover)
+                    self._total_samples += len(leftover)
+                return output
+            else:
+                # Pad remaining
+                output = np.pad(result, (0, num_samples - len(result)))
+                self._is_buffering = True
+                return output
 
     def clear(self) -> None:
         """Clear buffer on interruption or stop."""
-        self._buffer = np.array([], dtype=np.int16)
-        self._is_buffering = True
+        with self._lock:
+            self._chunks.clear()
+            self._total_samples = 0
+            self._is_buffering = True
 
     def has_audio(self) -> bool:
-        return len(self._buffer) > 0
+        with self._lock:
+            return self._total_samples > 0
 
 
 class SmartDuckingDSP:
@@ -102,6 +117,8 @@ class SmartDuckingDSP:
         self.current_gain: float = 1.0
         self.last_voice_activity_time: float = 0.0
         self.is_active: bool = False
+        self._cached_ramp_len: int = 0
+        self._cached_ramp: Optional[np.ndarray] = None
 
     def set_ducking_factor(self, factor: float) -> None:
         self.ducking_factor = max(0.0, min(1.0, factor))
@@ -147,7 +164,13 @@ class SmartDuckingDSP:
             max_gain_delta = rate_per_sec * chunk_duration
             end_gain = min(target_gain, self.current_gain + max_gain_delta)
 
-        gain_ramp = np.linspace(self.current_gain, end_gain, chunk_len, dtype=np.float32)
+        if chunk_len != self._cached_ramp_len:
+            self._cached_ramp_len = chunk_len
+        # Build ramp using np.linspace only when start/end gains differ significantly
+        if abs(self.current_gain - end_gain) < 1e-6:
+            gain_ramp = np.full(chunk_len, end_gain, dtype=np.float32)
+        else:
+            gain_ramp = np.linspace(self.current_gain, end_gain, chunk_len, dtype=np.float32)
         self.current_gain = end_gain
 
         bg_float = background_chunk.astype(np.float32)
@@ -267,14 +290,13 @@ class DualChannelAudioEngine:
         if stream is None:
             return None
         try:
-            with self._stream_lock:
-                if stream.is_stopped() or not stream.is_active():
-                    return None
-                # Check available frames before blocking read on macOS CoreAudio
-                available = stream.get_read_available()
-                if available < chunk_size:
-                    time.sleep(0.005)
-                return stream.read(chunk_size, exception_on_overflow=False)
+            if stream.is_stopped() or not stream.is_active():
+                return None
+            # Check available frames before blocking read on macOS CoreAudio
+            available = stream.get_read_available()
+            if available < chunk_size:
+                time.sleep(0.005)
+            return stream.read(chunk_size, exception_on_overflow=False)
         except Exception:
             return None
 
@@ -283,11 +305,10 @@ class DualChannelAudioEngine:
         if stream is None:
             return False
         try:
-            with self._stream_lock:
-                if stream.is_stopped() or not stream.is_active():
-                    return False
-                stream.write(data)
-                return True
+            if stream.is_stopped() or not stream.is_active():
+                return False
+            stream.write(data)
+            return True
         except Exception:
             return False
 
