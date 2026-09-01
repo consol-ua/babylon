@@ -85,6 +85,12 @@ class AudioStreamBuffer:
                 self._is_buffering = True
                 return output
 
+    def flush(self) -> None:
+        """Force flush buffer: mark as not buffering so all accumulated samples play out immediately."""
+        with self._lock:
+            if self._total_samples > 0:
+                self._is_buffering = False
+
     def clear(self) -> None:
         """Clear buffer on interruption or stop."""
         with self._lock:
@@ -395,6 +401,29 @@ class DualChannelAudioEngine:
 
         self.is_call_running = True
 
+    async def graceful_stop_call(self, timeout: float = 1.2) -> None:
+        """Allow any pending synthesized audio in buffer to play out before closing audio streams."""
+        self.is_call_running = False
+        self.outgoing_playback_buffer.flush()
+        self.incoming_playback_buffer.flush()
+
+        start = time.time()
+        while (time.time() - start) < timeout:
+            if not self.outgoing_playback_buffer.has_audio() and not self.incoming_playback_buffer.has_audio():
+                break
+            await asyncio.sleep(0.04)
+
+        for stream_attr in [
+            "my_mic_stream",
+            "call_virtual_mic_stream",
+            "call_input_stream",
+            "headphones_stream",
+        ]:
+            self._safe_close_stream(stream_attr)
+
+        self._drain_queues()
+        self.clear_playback_buffers()
+
     def stop_call(self) -> None:
         self.is_call_running = False
         time.sleep(0.03)  # Allow background executor tasks to exit read/write
@@ -441,6 +470,26 @@ class DualChannelAudioEngine:
             )
 
         self.is_dubbing_running = True
+
+    async def graceful_stop_dubbing(self, timeout: float = 1.2) -> None:
+        """Allow any pending voiceover audio in buffer to play out before closing dubbing streams."""
+        self.is_dubbing_running = False
+        self.incoming_playback_buffer.flush()
+
+        start = time.time()
+        while (time.time() - start) < timeout:
+            if not self.incoming_playback_buffer.has_audio():
+                break
+            await asyncio.sleep(0.04)
+
+        for stream_attr in [
+            "call_input_stream",
+            "headphones_stream",
+        ]:
+            self._safe_close_stream(stream_attr)
+
+        self._drain_queues()
+        self.clear_playback_buffers()
 
     def stop_dubbing(self) -> None:
         self.is_dubbing_running = False

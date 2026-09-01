@@ -280,10 +280,12 @@ def on_ai_error(error_msg: str, error_type: str) -> None:
 outgoing_ai.on_stt_result = on_out_stt
 outgoing_ai.on_translated_result = on_out_trans
 outgoing_ai.on_error = on_ai_error
+outgoing_ai.on_turn_complete = lambda: audio_engine.outgoing_playback_buffer.flush()
 
 incoming_ai.on_stt_result = on_in_stt
 incoming_ai.on_translated_result = on_in_trans
 incoming_ai.on_error = on_ai_error
+incoming_ai.on_turn_complete = lambda: audio_engine.incoming_playback_buffer.flush()
 
 # 20 FPS Broadcast Loop
 async def state_broadcast_loop() -> None:
@@ -454,8 +456,9 @@ async def stop_call():
     state.is_call_active = False
     outgoing_ai.stop()
     incoming_ai.stop()
+    # Gracefully drain remaining audio buffer to speakers/virtual mic
+    await audio_engine.graceful_stop_call(timeout=1.2)
     await cancel_tasks(active_call_tasks)
-    audio_engine.stop_call()
     add_log_entry("INFO", "Синхронний дзвінок зупинено.", "call")
     return {"status": "call_stopped"}
 
@@ -515,8 +518,9 @@ async def start_dubbing(req: DubbingStartRequest):
 async def stop_dubbing():
     state.is_dubbing_active = False
     incoming_ai.stop()
+    # Gracefully drain remaining audio buffer to headphones
+    await audio_engine.graceful_stop_dubbing(timeout=1.2)
     await cancel_tasks(active_dubbing_tasks)
-    audio_engine.stop_dubbing()
     add_log_entry("INFO", "Дублювання відео зупинено.", "dubbing")
     return {"status": "dubbing_stopped"}
 

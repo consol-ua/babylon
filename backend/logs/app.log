@@ -418,3 +418,107 @@
 [2026-09-02 00:17:31,826] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
 [2026-09-02 00:18:38,275] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
 [2026-09-02 00:18:38,275] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:22:45,297] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:22:45,475] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:22:45,475] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:22:56,456] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:22:56,639] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:22:56,639] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:23:48,413] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:23:48,413] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:23:58,082] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:23:58,082] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:24:00,095] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:24:00,095] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:24:50,153] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:24:50,153] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:25:07,701] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-02 00:25:07,701] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-02 00:25:36,377] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-02 00:25:36,377] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-02 00:26:10,341] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:26:10,341] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:26:40,608] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:26:40,608] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:27:14,150] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Kore).
+[2026-09-02 00:27:14,150] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Kore).
+[2026-09-02 00:27:45,335] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:27:45,335] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:28:50,022] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:28:50,558] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:28:50,749] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:28:50,749] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-02 00:29:46,431] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:29:46,431] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-02 00:31:00,137] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:31:00,137] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:31:19,874] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 70 мс.
+[2026-09-02 00:31:19,874] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 70 мс.
+[2026-09-02 00:31:20,036] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 60 мс.
+[2026-09-02 00:31:20,036] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 60 мс.
+[2026-09-02 00:31:20,067] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 50 мс.
+[2026-09-02 00:31:20,067] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 50 мс.
+[2026-09-02 00:31:20,081] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 40 мс.
+[2026-09-02 00:31:20,081] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 40 мс.
+[2026-09-02 00:31:29,106] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Kore).
+[2026-09-02 00:31:29,106] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Kore).
+[2026-09-02 00:32:02,836] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 130 мс.
+[2026-09-02 00:32:02,836] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 130 мс.
+[2026-09-02 00:32:03,070] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 140 мс.
+[2026-09-02 00:32:03,070] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 140 мс.
+[2026-09-02 00:32:03,151] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 150 мс.
+[2026-09-02 00:32:03,151] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 150 мс.
+[2026-09-02 00:32:03,186] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 160 мс.
+[2026-09-02 00:32:03,186] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 160 мс.
+[2026-09-02 00:32:03,202] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 170 мс.
+[2026-09-02 00:32:03,202] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 170 мс.
+[2026-09-02 00:32:03,216] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 190 мс.
+[2026-09-02 00:32:03,216] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 190 мс.
+[2026-09-02 00:32:03,233] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-02 00:32:03,233] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-02 00:32:03,250] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 210 мс.
+[2026-09-02 00:32:03,250] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 210 мс.
+[2026-09-02 00:32:03,266] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 220 мс.
+[2026-09-02 00:32:03,266] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 220 мс.
+[2026-09-02 00:32:03,282] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 230 мс.
+[2026-09-02 00:32:03,282] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 230 мс.
+[2026-09-02 00:32:03,303] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 240 мс.
+[2026-09-02 00:32:03,303] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 240 мс.
+[2026-09-02 00:32:03,349] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-09-02 00:32:03,349] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-09-02 00:32:03,801] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 240 мс.
+[2026-09-02 00:32:03,801] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 240 мс.
+[2026-09-02 00:32:03,817] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 230 мс.
+[2026-09-02 00:32:03,817] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 230 мс.
+[2026-09-02 00:32:03,850] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 220 мс.
+[2026-09-02 00:32:03,850] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 220 мс.
+[2026-09-02 00:32:03,895] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 210 мс.
+[2026-09-02 00:32:03,895] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 210 мс.
+[2026-09-02 00:32:03,901] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-02 00:32:03,901] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-02 00:32:04,238] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 190 мс.
+[2026-09-02 00:32:04,238] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 190 мс.
+[2026-09-02 00:32:04,288] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 180 мс.
+[2026-09-02 00:32:04,288] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 180 мс.
+[2026-09-02 00:32:04,351] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 170 мс.
+[2026-09-02 00:32:04,351] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 170 мс.
+[2026-09-02 00:32:04,818] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 180 мс.
+[2026-09-02 00:32:04,818] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 180 мс.
+[2026-09-02 00:32:04,903] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 190 мс.
+[2026-09-02 00:32:04,903] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 190 мс.
+[2026-09-02 00:32:05,435] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 180 мс.
+[2026-09-02 00:32:05,435] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 180 мс.
+[2026-09-02 00:32:08,480] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:32:08,480] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:32:09,261] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-02 00:32:09,261] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-02 00:32:13,665] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Kore).
+[2026-09-02 00:32:13,665] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Kore).
+[2026-09-02 00:33:18,432] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:33:18,432] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:33:23,469] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Puck).
+[2026-09-02 00:33:23,469] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Puck).
+[2026-09-02 00:36:00,234] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:36:00,234] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-02 00:36:14,884] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Puck).
+[2026-09-02 00:36:14,884] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Puck).
