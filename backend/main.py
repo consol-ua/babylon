@@ -119,6 +119,7 @@ AVAILABLE_VOICES = [
     {"id": "Aoede", "label": "Aoede (Жіночий / Виразний, глибокий)", "gender": "female"},
     {"id": "Kore", "label": "Kore (Жіночий / Спокійний, м'який)", "gender": "female"},
 ]
+VALID_VOICE_IDS = {v["id"] for v in AVAILABLE_VOICES}
 
 # Request Models
 class CallStartRequest(BaseModel):
@@ -181,14 +182,42 @@ class AppState:
         self.outgoing_stt: str = ""
         self.outgoing_translation: str = ""
         self.outgoing_volume_db: float = -100.0
+        self.outgoing_stt_history: List[Dict[str, str]] = []
+        self.outgoing_trans_history: List[Dict[str, str]] = []
 
         # Incoming (Call / Sample: Target -> UA)
         self.incoming_stt: str = ""
         self.incoming_translation: str = ""
         self.incoming_volume_db: float = -100.0
         self.is_incoming_ducking: bool = False
+        self.incoming_stt_history: List[Dict[str, str]] = []
+        self.incoming_trans_history: List[Dict[str, str]] = []
 
 state = AppState()
+
+def update_transcript_history(
+    history: List[Dict[str, str]],
+    new_text: str,
+    max_entries: int = 150
+) -> None:
+    text_clean = new_text.strip()
+    if not text_clean:
+        return
+    now_str = datetime.now().strftime("%H:%M:%S")
+
+    if not history:
+        history.append({"timestamp": now_str, "text": text_clean})
+    else:
+        last_entry = history[-1]
+        # If new_text is an extension or continuation of the last entry
+        if text_clean.startswith(last_entry["text"]) or last_entry["text"].startswith(text_clean):
+            last_entry["text"] = text_clean
+        else:
+            # New distinct sentence or speech turn
+            history.append({"timestamp": now_str, "text": text_clean})
+
+    if len(history) > max_entries:
+        history.pop(0)
 
 # WebSocket Manager
 class ConnectionManager:
@@ -225,15 +254,23 @@ audio_engine.incoming_telemetry_cb = on_incoming_telemetry
 # Hook up AI STT & Translation Callbacks
 def on_out_stt(text: str, is_final: bool) -> None:
     state.outgoing_stt = text
+    if text:
+        update_transcript_history(state.outgoing_stt_history, text)
 
 def on_out_trans(text: str) -> None:
     state.outgoing_translation = text
+    if text:
+        update_transcript_history(state.outgoing_trans_history, text)
 
 def on_in_stt(text: str, is_final: bool) -> None:
     state.incoming_stt = text
+    if text:
+        update_transcript_history(state.incoming_stt_history, text)
 
 def on_in_trans(text: str) -> None:
     state.incoming_translation = text
+    if text:
+        update_transcript_history(state.incoming_trans_history, text)
 
 def on_ai_error(error_msg: str, error_type: str) -> None:
     state.last_error = error_msg
@@ -268,11 +305,15 @@ async def state_broadcast_loop() -> None:
                     "outgoing": {
                         "stt_text": state.outgoing_stt,
                         "translated_text": state.outgoing_translation,
+                        "stt_history": state.outgoing_stt_history,
+                        "translated_history": state.outgoing_trans_history,
                         "volume_db": round(state.outgoing_volume_db, 1),
                     },
                     "incoming": {
                         "stt_text": state.incoming_stt,
                         "translated_text": state.incoming_translation,
+                        "stt_history": state.incoming_stt_history,
+                        "translated_history": state.incoming_trans_history,
                         "volume_db": round(state.incoming_volume_db, 1),
                         "is_ducking": state.is_incoming_ducking,
                     },
@@ -289,6 +330,8 @@ AVAILABLE_SAMPLES = [
         "category": "IT & Team",
         "description": "Daily status report: backend microservices, DB queries optimization, WebSocket integration.",
         "filename": "it_standup.wav",
+        "transcript_original": "Hey team, good morning. Yesterday I finished refactoring the backend microservices and optimized several slow database queries. Today I'm focusing on the WebSocket telemetry integration and running end-to-end latency benchmarks. No blockers on my end.",
+        "transcript_translated": "Всім привіт, доброго ранку. Вчора я завершив рефакторинг бекенд-мікросервісів та оптимізував кілька повільних запитів до бази даних. Сьогодні я зосереджуюсь на інтеграції телеметрії через WebSocket та тестуванні затримок. З мого боку блокерів немає.",
     },
     {
         "id": "tech_interview",
@@ -296,6 +339,8 @@ AVAILABLE_SAMPLES = [
         "category": "Job Interview",
         "description": "Technical question about high-load distributed streaming and geographic failover.",
         "filename": "tech_interview.wav",
+        "transcript_original": "Could you explain your architectural approach to designing a high-load, low-latency audio streaming pipeline with multi-region failover and automatic jitter buffer synchronization?",
+        "transcript_translated": "Чи могли б ви пояснити свій архітектурний підхід до проєктування високонавантаженого аудіострімінгу з низькою затримкою, географічним резервуванням та автоматичною синхронізацією джиттер-буфера?",
     },
     {
         "id": "small_talk",
@@ -303,6 +348,8 @@ AVAILABLE_SAMPLES = [
         "category": "General Conversation",
         "description": "Friendly conversation about weekly activities, pleasant weather, and weekend plans.",
         "filename": "small_talk.wav",
+        "transcript_original": "Hi there! The weather has been great all week. Are you planning any outdoor activities or weekend trips?",
+        "transcript_translated": "Привіт! Погода весь тиждень чудова. Чи плануєш щось на відкритому повітрі або поїздку на вихідні?",
     },
 ]
 
@@ -341,6 +388,11 @@ async def start_call(req: CallStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
+    if req.outgoing_voice not in VALID_VOICE_IDS:
+        raise HTTPException(status_code=400, detail=f"Невідомий голос для виходу: {req.outgoing_voice}")
+    if req.incoming_voice not in VALID_VOICE_IDS:
+        raise HTTPException(status_code=400, detail=f"Невідомий голос для входу: {req.incoming_voice}")
+
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
     outgoing_ai.set_api_key(api_key)
@@ -364,6 +416,10 @@ async def start_call(req: CallStartRequest):
     state.outgoing_translation = ""
     state.incoming_stt = ""
     state.incoming_translation = ""
+    state.outgoing_stt_history = []
+    state.outgoing_trans_history = []
+    state.incoming_stt_history = []
+    state.incoming_trans_history = []
 
     add_log_entry(
         "INFO",
@@ -409,6 +465,9 @@ async def start_dubbing(req: DubbingStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
+    if req.voice_name not in VALID_VOICE_IDS:
+        raise HTTPException(status_code=400, detail=f"Невідомий голос для дубляжу: {req.voice_name}")
+
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
     incoming_ai.set_api_key(api_key)
@@ -424,6 +483,8 @@ async def start_dubbing(req: DubbingStartRequest):
 
     state.incoming_stt = ""
     state.incoming_translation = ""
+    state.incoming_stt_history = []
+    state.incoming_trans_history = []
     state.is_dubbing_active = True
 
     add_log_entry(
@@ -464,6 +525,9 @@ async def start_sample_test(req: SampleStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
+    if req.voice_name not in VALID_VOICE_IDS:
+        raise HTTPException(status_code=400, detail=f"Невідомий голос для тестування: {req.voice_name}")
+
     sample_meta = next((s for s in AVAILABLE_SAMPLES if s["id"] == req.sample_id), None)
     if not sample_meta:
         raise HTTPException(status_code=404, detail="Sample not found")
@@ -487,6 +551,8 @@ async def start_sample_test(req: SampleStartRequest):
 
     state.incoming_stt = ""
     state.incoming_translation = ""
+    state.incoming_stt_history = []
+    state.incoming_trans_history = []
     state.active_sample_id = req.sample_id
     state.is_testing_active = True
 
@@ -536,6 +602,9 @@ async def start_mic_test_endpoint(req: MicTestStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
+    if req.voice_name not in VALID_VOICE_IDS:
+        raise HTTPException(status_code=400, detail=f"Невідомий голос для тесту мікрофона: {req.voice_name}")
+
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
     outgoing_ai.set_api_key(api_key)
@@ -546,6 +615,8 @@ async def start_mic_test_endpoint(req: MicTestStartRequest):
     state.outgoing_voice = req.voice_name
     state.outgoing_stt = ""
     state.outgoing_translation = ""
+    state.outgoing_stt_history = []
+    state.outgoing_trans_history = []
     state.mic_test_latency_ms = 0
     state.is_mic_test_active = True
 
@@ -615,6 +686,18 @@ def set_jitter_buffer(req: JitterBufferRequest):
     audio_engine.set_jitter_buffer_ms(req.jitter_buffer_ms)
     add_log_entry("INFO", f"Розмір Jitter Buffer: {req.jitter_buffer_ms} мс.", "audio")
     return {"jitter_buffer_ms": req.jitter_buffer_ms}
+
+@app.post("/transcripts/clear")
+def clear_transcripts_endpoint():
+    state.outgoing_stt = ""
+    state.outgoing_translation = ""
+    state.incoming_stt = ""
+    state.incoming_translation = ""
+    state.outgoing_stt_history = []
+    state.outgoing_trans_history = []
+    state.incoming_stt_history = []
+    state.incoming_trans_history = []
+    return {"status": "cleared"}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

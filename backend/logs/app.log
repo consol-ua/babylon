@@ -207,3 +207,148 @@
 [2026-08-31 23:58:02,147] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Fenrir).
 [2026-09-01 00:00:07,480] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
 [2026-09-01 00:00:07,480] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-01 22:17:19,153] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:17:19,770] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:17:19,988] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:17:19,988] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:29:03,296] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:29:03,501] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:29:03,501] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:30:15,852] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-09-01 22:30:15,852] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-09-01 22:30:40,600] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:30:40,600] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:30:41,811] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 225 мс.
+[2026-09-01 22:30:41,811] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 225 мс.
+[2026-09-01 22:30:42,158] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-09-01 22:30:42,158] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-09-01 22:30:42,175] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-09-01 22:30:42,175] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 250 мс.
+[2026-09-01 22:30:42,193] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 275 мс.
+[2026-09-01 22:30:42,193] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 275 мс.
+[2026-09-01 22:30:42,225] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 300 мс.
+[2026-09-01 22:30:42,225] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 300 мс.
+[2026-09-01 22:30:42,254] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 325 мс.
+[2026-09-01 22:30:42,254] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 325 мс.
+[2026-09-01 22:30:53,120] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:30:53,120] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:31:17,786] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:31:17,786] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:31:22,473] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-01 22:31:22,473] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 200 мс.
+[2026-09-01 22:31:22,807] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 175 мс.
+[2026-09-01 22:31:22,807] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 175 мс.
+[2026-09-01 22:45:42,683] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:45:42,683] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:46:01,367] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:46:01,367] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:46:01,474] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:46:01,474] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:46:02,547] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 150 мс.
+[2026-09-01 22:46:02,547] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 150 мс.
+[2026-09-01 22:46:02,564] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 125 мс.
+[2026-09-01 22:46:02,564] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 125 мс.
+[2026-09-01 22:46:02,596] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 100 мс.
+[2026-09-01 22:46:02,596] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 100 мс.
+[2026-09-01 22:46:02,612] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 75 мс.
+[2026-09-01 22:46:02,612] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 75 мс.
+[2026-09-01 22:46:02,630] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 75 мс.
+[2026-09-01 22:46:02,630] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 75 мс.
+[2026-09-01 22:46:02,646] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 50 мс.
+[2026-09-01 22:46:02,646] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 50 мс.
+[2026-09-01 22:46:03,016] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 75 мс.
+[2026-09-01 22:46:03,016] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 75 мс.
+[2026-09-01 22:46:03,616] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 50 мс.
+[2026-09-01 22:46:03,616] [INFO] [gemini_translator]: [audio] Розмір Jitter Buffer: 50 мс.
+[2026-09-01 22:46:06,523] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:46:06,523] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:46:31,230] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:46:31,230] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:46:31,339] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:46:31,339] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:46:33,778] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:46:33,778] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:46:53,007] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:46:53,007] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:46:53,115] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:46:53,115] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:46:54,022] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:46:54,022] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:47:08,626] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:47:08,626] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:47:08,729] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:47:08,729] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:47:37,053] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:47:37,053] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:47:46,553] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:47:46,553] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:47:46,658] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:47:46,658] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:55:06,879] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:07,118] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:07,118] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:16,453] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:16,635] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:16,635] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:30,832] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:31,018] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:31,018] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:34,371] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:34,554] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:55:34,554] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 22:56:54,069] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:56:54,069] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Kore).
+[2026-09-01 22:57:14,880] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:57:14,880] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 22:57:14,981] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:57:14,981] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 22:58:09,455] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-01 22:58:09,455] [INFO] [gemini_translator]: [dubbing] Запуск дублювання відео (джерело: en, голос дубляжу: Aoede).
+[2026-09-01 23:02:24,341] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-01 23:02:24,341] [INFO] [gemini_translator]: [dubbing] Дублювання відео зупинено.
+[2026-09-01 23:06:10,822] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:11,021] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:11,021] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:17,868] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:18,051] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:18,051] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:28,924] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:29,109] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:29,109] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:35,628] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:35,807] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:35,807] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:38,973] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:39,159] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:06:39,159] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:08:23,922] [INFO] [gemini_translator]: [system] Сервер перекладача успішно ініціалізовано.
+[2026-09-01 23:08:50,051] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:08:50,051] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:08:51,557] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:08:51,557] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:08:51,666] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 23:08:51,666] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 23:08:54,136] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:08:54,136] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:09:22,683] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:09:22,683] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:12:32,510] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:12:32,510] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:12:33,911] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:12:33,911] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:12:34,023] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 23:12:34,023] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 23:12:36,643] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:12:36,643] [INFO] [gemini_translator]: [sample] Запуск семплу 'IT Daily Standup' (голос: Aoede).
+[2026-09-01 23:13:05,206] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:13:05,206] [INFO] [gemini_translator]: [sample] Відтворення семплу 'IT Daily Standup' завершено (усі фрази озвучено).
+[2026-09-01 23:14:24,504] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-09-01 23:14:24,504] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-09-01 23:14:27,224] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 23:14:27,224] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 23:14:27,335] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 23:14:27,335] [INFO] [gemini_translator]: [sample] Тестування семплу зупинено.
+[2026-09-01 23:14:28,416] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-09-01 23:14:28,416] [INFO] [gemini_translator]: [sample] Запуск семплу 'System Architecture Interview' (голос: Aoede).
+[2026-09-01 23:14:53,089] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).
+[2026-09-01 23:14:53,089] [INFO] [gemini_translator]: [sample] Відтворення семплу 'System Architecture Interview' завершено (усі фрази озвучено).

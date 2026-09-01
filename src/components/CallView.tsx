@@ -217,12 +217,14 @@ export const CallView: React.FC<CallViewProps> = ({
             <TranscriptBox
               title="Що я сказав (Українська)"
               text={state.outgoing.stt_text}
+              history={state.outgoing.stt_history}
               placeholder="Говоріть у мікрофон українською..."
               themeColor="indigo"
             />
             <TranscriptBox
               title={`Переклад у Zoom (${partnerLangLabel}) [${outgoingVoice}]`}
               text={state.outgoing.translated_text}
+              history={state.outgoing.translated_history}
               placeholder="Синхронний AI-переклад транслюватиметься сюди..."
               themeColor="sky"
             />
@@ -369,12 +371,14 @@ export const CallView: React.FC<CallViewProps> = ({
             <TranscriptBox
               title={`Що каже співрозмовник (${partnerLangLabel})`}
               text={state.incoming.stt_text}
+              history={state.incoming.stt_history}
               placeholder="Очікування звуку зі співрозмовника..."
               themeColor="amber"
             />
             <TranscriptBox
               title={`Переклад у навушниках (Українська) [${incomingVoice}]`}
               text={state.incoming.translated_text}
+              history={state.incoming.translated_history}
               placeholder="Український голос та переклад з'являться тут..."
               themeColor="emerald"
             />

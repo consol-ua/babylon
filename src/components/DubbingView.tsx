@@ -391,6 +391,7 @@ export const DubbingView: React.FC<DubbingViewProps> = ({
         <TranscriptBox
           title={`Оригінальна мова відео (${sourceLangLabel.split(" ")[0]})`}
           text={state.incoming.stt_text}
+          history={state.incoming.stt_history}
           placeholder="Очікування виявлення мовлення у відеопотоці..."
           themeColor="indigo"
         />
@@ -398,6 +399,7 @@ export const DubbingView: React.FC<DubbingViewProps> = ({
         <TranscriptBox
           title="Український синхронний переклад 🇺🇦"
           text={state.incoming.translated_text}
+          history={state.incoming.translated_history}
           placeholder="Переклад з'явиться тут у реальному часі..."
           themeColor="emerald"
         />

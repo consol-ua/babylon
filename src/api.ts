@@ -12,6 +12,8 @@ export interface SampleInfo {
   category: string;
   description: string;
   filename: string;
+  transcript_original?: string;
+  transcript_translated?: string;
 }
 
 export interface GeminiVoice {
@@ -27,9 +29,16 @@ export interface LogEntry {
   source: string;
 }
 
+export interface TranscriptItem {
+  timestamp: string;
+  text: string;
+}
+
 export interface StreamTelemetry {
   stt_text: string;
   translated_text: string;
+  stt_history?: TranscriptItem[];
+  translated_history?: TranscriptItem[];
   volume_db: number;
   is_ducking?: boolean;
 }

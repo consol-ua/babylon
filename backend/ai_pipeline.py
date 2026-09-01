@@ -8,6 +8,9 @@ from google.genai import types
 from google.genai.errors import APIError
 
 
+VALID_VOICE_NAMES = {"Puck", "Charon", "Fenrir", "Aoede", "Kore"}
+
+
 class GeminiLiveAudioSession:
     """Independent Gemini 3.5 Live Streaming Session for a single directional audio channel."""
 
@@ -21,7 +24,7 @@ class GeminiLiveAudioSession:
     ) -> None:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.target_lang = target_lang
-        self.voice_name = voice_name
+        self.voice_name = voice_name if voice_name in VALID_VOICE_NAMES else "Puck"
         self.sample_rate = sample_rate
         self.channel_name = channel_name
 
@@ -59,8 +62,14 @@ class GeminiLiveAudioSession:
             self.client = None
 
     def set_voice(self, voice_name: str) -> None:
-        """Update voice name for speech synthesis."""
-        self.voice_name = voice_name
+        """Update voice name for speech synthesis when not running."""
+        if self.is_running:
+            print(f"[GeminiLiveAudioSession:{self.channel_name}] Warning: Voice change ignored during active session.")
+            return
+        if voice_name in VALID_VOICE_NAMES:
+            self.voice_name = voice_name
+        else:
+            print(f"[GeminiLiveAudioSession:{self.channel_name}] Warning: Unknown voice '{voice_name}', ignoring.")
 
     def _report_error(self, message: str, error_type: str = "API_ERROR") -> None:
         """Log error and notify UI callback."""
@@ -97,15 +106,40 @@ class GeminiLiveAudioSession:
             await self._run_simulation(input_queue)
             return
 
+        # Ensure voice name is strictly pinned to a valid prebuilt voice
+        if self.voice_name not in VALID_VOICE_NAMES:
+            self.voice_name = "Aoede" if self.channel_name == "incoming" else "Puck"
+
         speech_config = types.SpeechConfig(
             voice_config=types.VoiceConfig(
                 prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=self.voice_name)
             )
         )
 
+        if self.channel_name == "outgoing":
+            system_prompt = (
+                f"You are a dedicated real-time simultaneous voice interpreter translating spoken Ukrainian into {self.target_lang}. "
+                f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
+                f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
+                f"Only synthesize accurate speech in {self.target_lang}. Do not produce meta-commentary, explanations, or conversational filler."
+            )
+        else:
+            system_prompt = (
+                f"You are a dedicated real-time simultaneous voice interpreter translating incoming speech into Ukrainian (uk). "
+                f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
+                f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
+                f"Only synthesize accurate, fluent speech in Ukrainian. Do not produce meta-commentary, explanations, or conversational filler."
+            )
+
+        system_instruction = types.Content(
+            parts=[types.Part.from_text(text=system_prompt)]
+        )
+
         config = types.LiveConnectConfig(
             response_modalities=[types.Modality.AUDIO],
             speech_config=speech_config,
+            temperature=0.0,
+            system_instruction=system_instruction,
             translation_config=types.TranslationConfig(
                 target_language_code=self.target_lang,
                 echo_target_language=True,

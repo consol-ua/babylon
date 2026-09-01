@@ -18,6 +18,10 @@ import {
   CheckCircle2,
   Sliders,
   FileAudio,
+  FileText,
+  ChevronDown,
+  Copy,
+  Check,
   Zap,
   Play,
   Pause,
@@ -79,6 +83,21 @@ export const TestingView: React.FC<TestingViewProps> = ({
   const [recordSeconds, setRecordSeconds] = useState<number>(0);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [audioElem, setAudioElem] = useState<HTMLAudioElement | null>(null);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState<boolean>(false);
+  const [copiedField, setCopiedField] = useState<"original" | "translated" | null>(null);
+
+  const selectedSample = samples.find((s) => s.id === selectedSampleId);
+
+  const handleCopyText = async (text: string | undefined, field: "original" | "translated") => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      // ignore
+    }
+  };
 
   const inputDevices = devices.filter((d) => d.max_input_channels > 0);
   const outputDevices = devices.filter((d) => d.max_output_channels > 0);
@@ -211,6 +230,107 @@ export const TestingView: React.FC<TestingViewProps> = ({
             </div>
           </div>
 
+          {/* Sample Transcript Accordion */}
+          {selectedSample && (selectedSample.transcript_original || selectedSample.transcript_translated) && (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+              <button
+                type="button"
+                onClick={() => setIsTranscriptOpen(!isTranscriptOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-slate-900 hover:bg-slate-800/80 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-semibold text-slate-200">
+                    Транскрипція та еталонний текст семплу:{" "}
+                    <span className="text-indigo-400 font-normal">{selectedSample.title}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {isTranscriptOpen ? "Згорнути" : "Переглянути текст"}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                      isTranscriptOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {isTranscriptOpen && (
+                <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Original Transcript (EN) */}
+                  <div className="bg-slate-900 border border-slate-800/90 rounded-lg p-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          Оригінальний аудіозапис (EN)
+                        </span>
+                        {selectedSample.transcript_original && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(selectedSample.transcript_original, "original")}
+                            title="Скопіювати оригінал"
+                            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-800"
+                          >
+                            {copiedField === "original" ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span className="text-emerald-400 font-medium">Скопійовано</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Копіювати</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <p className="font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                        {selectedSample.transcript_original || "Текст відсутній"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Translated Transcript (UA) */}
+                  <div className="bg-slate-900 border border-slate-800/90 rounded-lg p-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                          Еталонний переклад (UA)
+                        </span>
+                        {selectedSample.transcript_translated && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(selectedSample.transcript_translated, "translated")}
+                            title="Скопіювати переклад"
+                            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-800"
+                          >
+                            {copiedField === "translated" ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span className="text-emerald-400 font-medium">Скопійовано</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Копіювати</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <p className="font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                        {selectedSample.transcript_translated || "Переклад відсутній"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Audio Output & DSP Controls */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
             <div className="space-y-3">
@@ -337,12 +457,14 @@ export const TestingView: React.FC<TestingViewProps> = ({
             <TranscriptBox
               title={`Оригінал із аудіозапису (${partnerLangLabel})`}
               text={state.incoming.stt_text}
+              history={state.incoming.stt_history}
               placeholder="Текст із тестового аудіозапису з'явиться тут..."
               themeColor="amber"
             />
             <TranscriptBox
               title={`Синхронний переклад (Українська) [${sampleVoice}]`}
               text={state.incoming.translated_text}
+              history={state.incoming.translated_history}
               placeholder="Синхронний український переклад та голос лунатимуть у навушниках до завершення фраз..."
               themeColor="emerald"
             />
@@ -503,12 +625,14 @@ export const TestingView: React.FC<TestingViewProps> = ({
                 <TranscriptBox
                   title="Що ви сказали в мікрофон (Українська)"
                   text={micTestResult.stt_text || state.outgoing.stt_text}
+                  history={state.outgoing.stt_history}
                   placeholder="Не вдалося розпізнати мову..."
                   themeColor="indigo"
                 />
                 <TranscriptBox
                   title={`Що почув би співрозмовник (${partnerLangLabel})`}
                   text={micTestResult.translated_text || state.outgoing.translated_text}
+                  history={state.outgoing.translated_history}
                   placeholder="Переклад відсутній..."
                   themeColor="sky"
                 />
