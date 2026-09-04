@@ -6,4 +6,9 @@ google-genai>=1.0.0
 websockets>=12.0
 pydantic>=2.12.5,<2.13.0
 python-dotenv>=1.0.0
+python-multipart>=0.0.9
+onnxruntime>=1.18.0
+scipy>=1.12.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
 

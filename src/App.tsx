@@ -18,15 +18,17 @@ import {
   Video,
 } from "lucide-react";
 
+import { VoiceSelection } from "./types/voice";
+
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"call" | "dubbing" | "testing">("call");
   
   const [partnerLang, setPartnerLang] = useState<string>("en");
-  const [outgoingVoice, setOutgoingVoice] = useState<string>("Puck");
-  const [incomingVoice, setIncomingVoice] = useState<string>("Aoede");
-  const [dubbingVoice, setDubbingVoice] = useState<string>("Aoede");
-  const [sampleVoice, setSampleVoice] = useState<string>("Aoede");
-  const [micTestVoice, setMicTestVoice] = useState<string>("Puck");
+  const [outgoingVoice, setOutgoingVoice] = useState<VoiceSelection>({ mode: "cloud", voice_id: "Puck" });
+  const [incomingVoice, setIncomingVoice] = useState<VoiceSelection>({ mode: "cloud", voice_id: "Aoede" });
+  const [dubbingVoice, setDubbingVoice] = useState<VoiceSelection>({ mode: "cloud", voice_id: "Aoede" });
+  const [sampleVoice, setSampleVoice] = useState<VoiceSelection>({ mode: "cloud", voice_id: "Aoede" });
+  const [micTestVoice, setMicTestVoice] = useState<VoiceSelection>({ mode: "cloud", voice_id: "Puck" });
   const [selectedSampleId, setSelectedSampleId] = useState<string>("it_standup");
 
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem("GEMINI_API_KEY") || "");
@@ -203,6 +205,7 @@ export const App: React.FC = () => {
             headphonesIndex={audioDevices.headphonesIndex}
             onSelectHeadphones={audioDevices.setHeadphonesIndex}
             partnerLangLabel={partnerLangOption.label}
+            partnerLangCode={partnerLangOption.code}
             outgoingVoice={outgoingVoice}
             onSelectOutgoingVoice={setOutgoingVoice}
             incomingVoice={incomingVoice}
@@ -266,6 +269,7 @@ export const App: React.FC = () => {
             headphonesIndex={audioDevices.headphonesIndex}
             onSelectHeadphones={audioDevices.setHeadphonesIndex}
             partnerLangLabel={partnerLangOption.label}
+            partnerLangCode={partnerLangOption.code}
             sampleVoice={sampleVoice}
             onSelectSampleVoice={setSampleVoice}
             micTestVoice={micTestVoice}

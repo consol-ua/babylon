@@ -242,6 +242,9 @@ class GeminiLiveAudioSession:
                                             
                                             if self.on_audio_chunk:
                                                 self.on_audio_chunk(audio_16k)
+                                    elif part.text:
+                                        if self.on_translated_result:
+                                            self.on_translated_result(part.text)
 
                             # User input transcription (Source text)
                             if content.input_transcription and content.input_transcription.text:

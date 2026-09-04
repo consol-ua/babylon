@@ -60,14 +60,16 @@ export interface DualBackendState {
   incoming: StreamTelemetry;
 }
 
+import { VoiceSelection } from './types/voice';
+
 export interface CallStartPayload {
   my_mic_index?: number;
   call_virtual_mic_index?: number;
   call_input_index?: number;
   headphones_index?: number;
   partner_lang: string;
-  outgoing_voice: string;
-  incoming_voice: string;
+  outgoing_voice: string | VoiceSelection;
+  incoming_voice: string | VoiceSelection;
   ducking_factor: number;
   jitter_buffer_ms: number;
   api_key?: string;
@@ -77,7 +79,7 @@ export interface DubbingStartPayload {
   input_device_index?: number;
   headphones_index?: number;
   source_lang: string;
-  voice_name: string;
+  voice_name: string | VoiceSelection;
   ducking_factor: number;
   jitter_buffer_ms: number;
   api_key?: string;
@@ -89,14 +91,14 @@ export interface SampleStartPayload {
   ducking_factor: number;
   jitter_buffer_ms: number;
   partner_lang: string;
-  voice_name: string;
+  voice_name: string | VoiceSelection;
   api_key?: string;
 }
 
 export interface MicTestStartPayload {
   mic_index?: number;
   partner_lang: string;
-  voice_name: string;
+  voice_name: string | VoiceSelection;
   api_key?: string;
 }
 

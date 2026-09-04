@@ -4,8 +4,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional, Set, List, Dict
+from typing import Optional, Set, List, Dict, Union
 from datetime import datetime
+import base64
+import io
+import wave
 from dotenv import load_dotenv
 
 # Load .env file from backend or root directory
@@ -15,13 +18,16 @@ if env_path.exists():
 else:
     load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from audio_engine import DualChannelAudioEngine
 from ai_pipeline import GeminiLiveAudioSession
+from tts.models import VoiceSelection, VoiceProfile, CreateVoiceProfilePayload, TestSynthesizePayload
+from tts.sentence_streamer import PunctuationSentenceStreamer
+from tts.manager import LocalTTSManager
 
 # Setup Logging
 LOGS_DIR = Path(__file__).parent / "logs"
@@ -122,6 +128,33 @@ AVAILABLE_VOICES = [
 ]
 VALID_VOICE_IDS = {v["id"] for v in AVAILABLE_VOICES}
 
+# Local TTS & Voice Cloning Infrastructure
+tts_manager = LocalTTSManager()
+outgoing_streamer = PunctuationSentenceStreamer()
+incoming_streamer = PunctuationSentenceStreamer()
+outgoing_tts_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+incoming_tts_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+
+def normalize_voice_selection(
+    voice: Union[VoiceSelection, dict, str, None],
+    default_voice: str = "Puck"
+) -> VoiceSelection:
+    if isinstance(voice, VoiceSelection):
+        return voice
+    if isinstance(voice, dict):
+        return VoiceSelection(**voice)
+    if isinstance(voice, str) and voice:
+        if voice in VALID_VOICE_IDS:
+            return VoiceSelection(mode="cloud", voice_id=voice)
+        elif voice.startswith("uk_") or voice.startswith("en_"):
+            return VoiceSelection(mode="local", voice_id=voice)
+        else:
+            p = tts_manager.storage.get_profile(voice)
+            if p:
+                return VoiceSelection(mode="cloned" if p.engine_type == "cloned" else "local", voice_id=voice)
+            return VoiceSelection(mode="cloud", voice_id=voice if voice in VALID_VOICE_IDS else default_voice)
+    return VoiceSelection(mode="cloud", voice_id=default_voice)
+
 # Request Models
 class CallStartRequest(BaseModel):
     my_mic_index: Optional[int] = None
@@ -129,8 +162,8 @@ class CallStartRequest(BaseModel):
     call_input_index: Optional[int] = None
     headphones_index: Optional[int] = None
     partner_lang: str = "en"
-    outgoing_voice: str = "Puck"
-    incoming_voice: str = "Aoede"
+    outgoing_voice: Union[VoiceSelection, dict, str] = "Puck"
+    incoming_voice: Union[VoiceSelection, dict, str] = "Aoede"
     ducking_factor: float = 0.2
     jitter_buffer_ms: int = 150
     api_key: Optional[str] = None
@@ -141,14 +174,14 @@ class SampleStartRequest(BaseModel):
     ducking_factor: float = 0.2
     jitter_buffer_ms: int = 150
     partner_lang: str = "en"
-    voice_name: str = "Aoede"
+    voice_name: Union[VoiceSelection, dict, str] = "Aoede"
     api_key: Optional[str] = None
 
 class DubbingStartRequest(BaseModel):
     input_device_index: Optional[int] = None
     headphones_index: Optional[int] = None
     source_lang: str = "en"
-    voice_name: str = "Aoede"
+    voice_name: Union[VoiceSelection, dict, str] = "Aoede"
     ducking_factor: float = 0.2
     jitter_buffer_ms: int = 150
     api_key: Optional[str] = None
@@ -156,7 +189,7 @@ class DubbingStartRequest(BaseModel):
 class MicTestStartRequest(BaseModel):
     mic_index: Optional[int] = None
     partner_lang: str = "en"
-    voice_name: str = "Puck"
+    voice_name: Union[VoiceSelection, dict, str] = "Puck"
     api_key: Optional[str] = None
 
 class DuckingRequest(BaseModel):
@@ -175,6 +208,8 @@ class AppState:
         self.partner_lang: str = "en"
         self.outgoing_voice: str = "Puck"
         self.incoming_voice: str = "Aoede"
+        self.outgoing_voice_selection: VoiceSelection = VoiceSelection(mode="cloud", voice_id="Puck")
+        self.incoming_voice_selection: VoiceSelection = VoiceSelection(mode="cloud", voice_id="Aoede")
         self.jitter_buffer_ms: int = 75
         self.last_error: Optional[str] = None
         self.mic_test_latency_ms: int = 0
@@ -195,6 +230,48 @@ class AppState:
         self.incoming_trans_history: List[Dict[str, str]] = []
 
 state = AppState()
+
+# TTS Background Workers
+async def outgoing_local_tts_worker() -> None:
+    while True:
+        clause = await outgoing_tts_queue.get()
+        if clause is None:
+            break
+        try:
+            pcm = await tts_manager.synthesize_phrase(clause, state.outgoing_voice_selection)
+            if len(pcm) > 0:
+                audio_engine.push_outgoing_tts_chunk(pcm)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            add_log_entry("ERROR", f"Local TTS outgoing error: {e}", "tts")
+
+async def incoming_local_tts_worker() -> None:
+    while True:
+        clause = await incoming_tts_queue.get()
+        if clause is None:
+            break
+        try:
+            pcm = await tts_manager.synthesize_phrase(clause, state.incoming_voice_selection)
+            if len(pcm) > 0:
+                audio_engine.push_incoming_tts_chunk(pcm)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            add_log_entry("ERROR", f"Local TTS incoming error: {e}", "tts")
+
+async def streamer_idle_flush_loop() -> None:
+    while True:
+        await asyncio.sleep(0.1)
+        if state.is_call_active or state.is_dubbing_active or state.is_testing_active:
+            if state.outgoing_voice_selection.mode in ("local", "cloned"):
+                flushed = outgoing_streamer.flush_if_idle(max_idle_seconds=0.45, min_words=3)
+                if flushed:
+                    outgoing_tts_queue.put_nowait(flushed)
+            if state.incoming_voice_selection.mode in ("local", "cloned"):
+                flushed = incoming_streamer.flush_if_idle(max_idle_seconds=0.45, min_words=3)
+                if flushed:
+                    incoming_tts_queue.put_nowait(flushed)
 
 def update_transcript_history(
     history: List[Dict[str, str]],
@@ -262,6 +339,10 @@ def on_out_trans(text: str) -> None:
     state.outgoing_translation = text
     if text:
         update_transcript_history(state.outgoing_trans_history, text)
+        if state.outgoing_voice_selection.mode in ("local", "cloned"):
+            clauses = outgoing_streamer.feed(text)
+            for clause in clauses:
+                outgoing_tts_queue.put_nowait(clause)
 
 def on_in_stt(text: str, is_final: bool) -> None:
     state.incoming_stt = text
@@ -272,20 +353,58 @@ def on_in_trans(text: str) -> None:
     state.incoming_translation = text
     if text:
         update_transcript_history(state.incoming_trans_history, text)
+        if state.incoming_voice_selection.mode in ("local", "cloned"):
+            clauses = incoming_streamer.feed(text)
+            for clause in clauses:
+                incoming_tts_queue.put_nowait(clause)
 
 def on_ai_error(error_msg: str, error_type: str) -> None:
     state.last_error = error_msg
     add_log_entry("ERROR", error_msg, f"GeminiAPI:{error_type}")
 
+def on_out_turn_complete() -> None:
+    if state.outgoing_voice_selection.mode in ("local", "cloned"):
+        rem = outgoing_streamer.clear()
+        if rem:
+            outgoing_tts_queue.put_nowait(rem)
+    audio_engine.outgoing_playback_buffer.flush()
+
+def on_in_turn_complete() -> None:
+    if state.incoming_voice_selection.mode in ("local", "cloned"):
+        rem = incoming_streamer.clear()
+        if rem:
+            incoming_tts_queue.put_nowait(rem)
+    audio_engine.incoming_playback_buffer.flush()
+
+def on_out_interrupt() -> None:
+    outgoing_streamer.clear()
+    while not outgoing_tts_queue.empty():
+        try:
+            outgoing_tts_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+    audio_engine.clear_playback_buffers()
+
+def on_in_interrupt() -> None:
+    incoming_streamer.clear()
+    while not incoming_tts_queue.empty():
+        try:
+            incoming_tts_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+    audio_engine.clear_playback_buffers()
+
 outgoing_ai.on_stt_result = on_out_stt
 outgoing_ai.on_translated_result = on_out_trans
 outgoing_ai.on_error = on_ai_error
-outgoing_ai.on_turn_complete = lambda: audio_engine.outgoing_playback_buffer.flush()
+outgoing_ai.on_turn_complete = on_out_turn_complete
+outgoing_ai.on_interrupt = on_out_interrupt
 
 incoming_ai.on_stt_result = on_in_stt
 incoming_ai.on_translated_result = on_in_trans
 incoming_ai.on_error = on_ai_error
-incoming_ai.on_turn_complete = lambda: audio_engine.incoming_playback_buffer.flush()
+incoming_ai.on_turn_complete = on_in_turn_complete
+incoming_ai.on_interrupt = on_in_interrupt
 
 # 20 FPS Broadcast Loop
 async def state_broadcast_loop() -> None:
@@ -363,6 +482,77 @@ def get_devices():
 def get_voices():
     return {"voices": AVAILABLE_VOICES}
 
+@app.get("/api/voices/options")
+def get_voices_options(language: Optional[str] = None):
+    options = tts_manager.get_available_voices(language=language)
+    cloud = [v for v in options if v.mode == "cloud"]
+    local = [v for v in options if v.mode == "local"]
+    cloned = [v for v in options if v.mode == "cloned"]
+    return {
+        "options": options,
+        "cloud": [{"id": v.id, "label": v.name, "gender": "neutral"} for v in cloud],
+        "local": [{"id": v.id, "name": v.name, "language": v.language, "description": v.description} for v in local],
+        "cloned": tts_manager.storage.list_profiles(language=language),
+    }
+
+@app.get("/api/voice-profiles")
+def get_voice_profiles(language: Optional[str] = None):
+    return {"profiles": tts_manager.storage.list_profiles(language=language)}
+
+@app.post("/api/voice-profiles")
+def create_voice_profile(req: CreateVoiceProfilePayload):
+    import time
+    profile_id = f"{req.name.lower().replace(' ', '_')}_{str(int(time.time()))[-4:]}"
+    profile = VoiceProfile(
+        id=profile_id,
+        name=req.name,
+        language=req.language,
+        engine_type=req.engine_type,
+        model_name=req.model_name,
+    )
+    saved = tts_manager.storage.create_profile(profile)
+    return saved
+
+@app.post("/api/voice-profiles/{profile_id}/upload-sample")
+@app.post("/api/voice-profiles/{profile_id}/sample")
+async def upload_voice_sample(profile_id: str, file: UploadFile = File(...)):
+    contents = await file.read()
+    updated = tts_manager.storage.save_sample(profile_id, contents, file.filename or "sample.wav")
+    if not updated:
+        raise HTTPException(status_code=404, detail="Профіль не знайдено або аудіо некоректне")
+    return updated
+
+@app.post("/api/voice-profiles/{profile_id}/record-sample")
+async def record_voice_sample(profile_id: str):
+    profile = tts_manager.storage.get_profile(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Профіль не знайдено")
+    return profile
+
+@app.post("/api/voice-profiles/test-synthesize")
+async def test_synthesize(req: TestSynthesizePayload):
+    selection = VoiceSelection(mode=req.mode, voice_id=req.voice_id)
+    audio_pcm = await tts_manager.synthesize_phrase(req.text, selection)
+
+    bio = io.BytesIO()
+    with wave.open(bio, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(audio_pcm.tobytes())
+    b64 = base64.b64encode(bio.getvalue()).decode("utf-8")
+    return {"status": "ok", "audio_base64": b64}
+
+@app.delete("/api/voice-profiles/{profile_id}")
+def delete_voice_profile(profile_id: str):
+    try:
+        success = tts_manager.storage.delete_profile(profile_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Профіль не знайдено")
+        return {"status": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.get("/samples")
 def get_samples():
     return {"samples": AVAILABLE_SAMPLES}
@@ -390,10 +580,12 @@ async def start_call(req: CallStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
-    if req.outgoing_voice not in VALID_VOICE_IDS:
-        raise HTTPException(status_code=400, detail=f"Невідомий голос для виходу: {req.outgoing_voice}")
-    if req.incoming_voice not in VALID_VOICE_IDS:
-        raise HTTPException(status_code=400, detail=f"Невідомий голос для входу: {req.incoming_voice}")
+    out_sel = normalize_voice_selection(req.outgoing_voice, default_voice="Puck")
+    in_sel = normalize_voice_selection(req.incoming_voice, default_voice="Aoede")
+    state.outgoing_voice_selection = out_sel
+    state.incoming_voice_selection = in_sel
+    state.outgoing_voice = out_sel.voice_id
+    state.incoming_voice = in_sel.voice_id
 
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
@@ -401,15 +593,21 @@ async def start_call(req: CallStartRequest):
     incoming_ai.set_api_key(api_key)
 
     state.partner_lang = req.partner_lang
-    state.outgoing_voice = req.outgoing_voice
-    state.incoming_voice = req.incoming_voice
     state.jitter_buffer_ms = req.jitter_buffer_ms
 
     outgoing_ai.target_lang = req.partner_lang
-    outgoing_ai.set_voice(req.outgoing_voice)
+    if out_sel.mode == "cloud":
+        outgoing_ai.set_voice(out_sel.voice_id)
+        outgoing_ai.on_audio_chunk = audio_engine.push_outgoing_tts_chunk
+    else:
+        outgoing_ai.on_audio_chunk = None
 
     incoming_ai.target_lang = "uk"
-    incoming_ai.set_voice(req.incoming_voice)
+    if in_sel.mode == "cloud":
+        incoming_ai.set_voice(in_sel.voice_id)
+        incoming_ai.on_audio_chunk = audio_engine.push_incoming_tts_chunk
+    else:
+        incoming_ai.on_audio_chunk = None
 
     audio_engine.set_ducking_factor(req.ducking_factor)
     audio_engine.set_jitter_buffer_ms(req.jitter_buffer_ms)
@@ -425,7 +623,7 @@ async def start_call(req: CallStartRequest):
 
     add_log_entry(
         "INFO",
-        f"Запуск дзвінка (мова: {req.partner_lang}, вихідний голос: {req.outgoing_voice}, вхідний: {req.incoming_voice}).",
+        f"Запуск дзвінка (мова: {req.partner_lang}, вихідний: {out_sel.mode}:{out_sel.voice_id}, вхідний: {in_sel.mode}:{in_sel.voice_id}).",
         "call",
     )
 
@@ -446,7 +644,10 @@ async def start_call(req: CallStartRequest):
     t2 = asyncio.create_task(audio_engine.incoming_process_loop())
     t3 = asyncio.create_task(outgoing_ai.run(audio_engine.outgoing_input_queue))
     t4 = asyncio.create_task(incoming_ai.run(audio_engine.incoming_input_queue))
-    active_call_tasks.update([t1, t2, t3, t4])
+    t5 = asyncio.create_task(outgoing_local_tts_worker())
+    t6 = asyncio.create_task(incoming_local_tts_worker())
+    t7 = asyncio.create_task(streamer_idle_flush_loop())
+    active_call_tasks.update([t1, t2, t3, t4, t5, t6, t7])
 
     state.is_call_active = True
     return {"status": "call_started"}
@@ -456,6 +657,8 @@ async def stop_call():
     state.is_call_active = False
     outgoing_ai.stop()
     incoming_ai.stop()
+    outgoing_tts_queue.put_nowait(None)
+    incoming_tts_queue.put_nowait(None)
     # Gracefully drain remaining audio buffer to speakers/virtual mic
     await audio_engine.graceful_stop_call(timeout=1.2)
     await cancel_tasks(active_call_tasks)
@@ -468,17 +671,21 @@ async def start_dubbing(req: DubbingStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
-    if req.voice_name not in VALID_VOICE_IDS:
-        raise HTTPException(status_code=400, detail=f"Невідомий голос для дубляжу: {req.voice_name}")
+    in_sel = normalize_voice_selection(req.voice_name, default_voice="Aoede")
+    state.incoming_voice_selection = in_sel
+    state.incoming_voice = in_sel.voice_id
 
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
     incoming_ai.set_api_key(api_key)
     incoming_ai.target_lang = "uk"
-    incoming_ai.set_voice(req.voice_name)
+    if in_sel.mode == "cloud":
+        incoming_ai.set_voice(in_sel.voice_id)
+        incoming_ai.on_audio_chunk = audio_engine.push_incoming_tts_chunk
+    else:
+        incoming_ai.on_audio_chunk = None
 
     state.partner_lang = req.source_lang
-    state.incoming_voice = req.voice_name
     state.jitter_buffer_ms = req.jitter_buffer_ms
 
     audio_engine.set_ducking_factor(req.ducking_factor)
@@ -492,7 +699,7 @@ async def start_dubbing(req: DubbingStartRequest):
 
     add_log_entry(
         "INFO",
-        f"Запуск дублювання відео (джерело: {req.source_lang}, голос дубляжу: {req.voice_name}).",
+        f"Запуск дублювання відео (джерело: {req.source_lang}, голос: {in_sel.mode}:{in_sel.voice_id}).",
         "dubbing",
     )
 
@@ -510,7 +717,9 @@ async def start_dubbing(req: DubbingStartRequest):
 
     t1 = asyncio.create_task(audio_engine.incoming_process_loop())
     t2 = asyncio.create_task(incoming_ai.run(audio_engine.incoming_input_queue))
-    active_dubbing_tasks.update([t1, t2])
+    t3 = asyncio.create_task(incoming_local_tts_worker())
+    t4 = asyncio.create_task(streamer_idle_flush_loop())
+    active_dubbing_tasks.update([t1, t2, t3, t4])
 
     return {"status": "dubbing_started"}
 
@@ -518,6 +727,7 @@ async def start_dubbing(req: DubbingStartRequest):
 async def stop_dubbing():
     state.is_dubbing_active = False
     incoming_ai.stop()
+    incoming_tts_queue.put_nowait(None)
     # Gracefully drain remaining audio buffer to headphones
     await audio_engine.graceful_stop_dubbing(timeout=1.2)
     await cancel_tasks(active_dubbing_tasks)
@@ -529,9 +739,6 @@ async def start_sample_test(req: SampleStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
-    if req.voice_name not in VALID_VOICE_IDS:
-        raise HTTPException(status_code=400, detail=f"Невідомий голос для тестування: {req.voice_name}")
-
     sample_meta = next((s for s in AVAILABLE_SAMPLES if s["id"] == req.sample_id), None)
     if not sample_meta:
         raise HTTPException(status_code=404, detail="Sample not found")
@@ -540,14 +747,21 @@ async def start_sample_test(req: SampleStartRequest):
     if not sample_path.exists():
         raise HTTPException(status_code=404, detail=f"Sample file {sample_meta['filename']} missing")
 
+    in_sel = normalize_voice_selection(req.voice_name, default_voice="Aoede")
+    state.incoming_voice_selection = in_sel
+    state.incoming_voice = in_sel.voice_id
+
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
     incoming_ai.set_api_key(api_key)
     incoming_ai.target_lang = "uk"
-    incoming_ai.set_voice(req.voice_name)
+    if in_sel.mode == "cloud":
+        incoming_ai.set_voice(in_sel.voice_id)
+        incoming_ai.on_audio_chunk = audio_engine.push_incoming_tts_chunk
+    else:
+        incoming_ai.on_audio_chunk = None
 
     state.partner_lang = req.partner_lang
-    state.incoming_voice = req.voice_name
     state.jitter_buffer_ms = req.jitter_buffer_ms
 
     audio_engine.set_ducking_factor(req.ducking_factor)
@@ -560,7 +774,7 @@ async def start_sample_test(req: SampleStartRequest):
     state.active_sample_id = req.sample_id
     state.is_testing_active = True
 
-    add_log_entry("INFO", f"Запуск семплу '{sample_meta['title']}' (голос: {req.voice_name}).", "sample")
+    add_log_entry("INFO", f"Запуск семплу '{sample_meta['title']}' (голос: {in_sel.mode}:{in_sel.voice_id}).", "sample")
 
     try:
         audio_engine.start_sample_test(headphones_index=req.headphones_index)
@@ -572,13 +786,16 @@ async def start_sample_test(req: SampleStartRequest):
         raise HTTPException(status_code=500, detail=err_msg)
 
     t_ai = asyncio.create_task(incoming_ai.run(audio_engine.incoming_input_queue))
-    active_sample_tasks.add(t_ai)
+    t_tts = asyncio.create_task(incoming_local_tts_worker())
+    t_flush = asyncio.create_task(streamer_idle_flush_loop())
+    active_sample_tasks.update([t_ai, t_tts, t_flush])
 
     async def run_sample():
         try:
             await audio_engine.sample_playback_loop(str(sample_path))
         finally:
             incoming_ai.stop()
+            incoming_tts_queue.put_nowait(None)
             audio_engine.stop_sample_test()
             state.is_testing_active = False
             state.active_sample_id = None
@@ -594,6 +811,7 @@ async def stop_sample_test():
     state.is_testing_active = False
     state.active_sample_id = None
     incoming_ai.stop()
+    incoming_tts_queue.put_nowait(None)
     await cancel_tasks(active_sample_tasks)
     audio_engine.stop_sample_test()
     add_log_entry("INFO", "Тестування семплу зупинено.", "sample")
@@ -606,17 +824,21 @@ async def start_mic_test_endpoint(req: MicTestStartRequest):
     if state.is_call_active or state.is_dubbing_active or state.is_testing_active or state.is_mic_test_active:
         return {"status": "already_running"}
 
-    if req.voice_name not in VALID_VOICE_IDS:
-        raise HTTPException(status_code=400, detail=f"Невідомий голос для тесту мікрофона: {req.voice_name}")
+    out_sel = normalize_voice_selection(req.voice_name, default_voice="Puck")
+    state.outgoing_voice_selection = out_sel
+    state.outgoing_voice = out_sel.voice_id
 
     state.last_error = None
     api_key = req.api_key or os.environ.get("GEMINI_API_KEY", "")
     outgoing_ai.set_api_key(api_key)
     outgoing_ai.target_lang = req.partner_lang
-    outgoing_ai.set_voice(req.voice_name)
+    if out_sel.mode == "cloud":
+        outgoing_ai.set_voice(out_sel.voice_id)
+        outgoing_ai.on_audio_chunk = audio_engine.push_outgoing_tts_chunk
+    else:
+        outgoing_ai.on_audio_chunk = None
 
     state.partner_lang = req.partner_lang
-    state.outgoing_voice = req.voice_name
     state.outgoing_stt = ""
     state.outgoing_translation = ""
     state.outgoing_stt_history = []
@@ -624,7 +846,7 @@ async def start_mic_test_endpoint(req: MicTestStartRequest):
     state.mic_test_latency_ms = 0
     state.is_mic_test_active = True
 
-    add_log_entry("INFO", f"Початок тесту мікрофона (UA -> {req.partner_lang}, голос: {req.voice_name}).", "mic_test")
+    add_log_entry("INFO", f"Початок тесту мікрофона (UA -> {req.partner_lang}, голос: {out_sel.mode}:{out_sel.voice_id}).", "mic_test")
 
     try:
         audio_engine.start_mic_test(mic_index=req.mic_index)
@@ -637,7 +859,8 @@ async def start_mic_test_endpoint(req: MicTestStartRequest):
 
     t_engine = asyncio.create_task(audio_engine.mic_test_loop())
     t_ai = asyncio.create_task(outgoing_ai.run(audio_engine.outgoing_input_queue))
-    active_mic_test_tasks.update([t_engine, t_ai])
+    t_tts = asyncio.create_task(outgoing_local_tts_worker())
+    active_mic_test_tasks.update([t_engine, t_ai, t_tts])
 
     return {"status": "mic_test_started"}
 
@@ -653,6 +876,7 @@ async def stop_mic_test_endpoint():
     await asyncio.sleep(1.8)
 
     outgoing_ai.stop()
+    outgoing_tts_queue.put_nowait(None)
     await cancel_tasks(active_mic_test_tasks)
     file_path = audio_engine.stop_mic_test()
     state.is_mic_test_active = False

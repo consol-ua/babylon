@@ -20,17 +20,20 @@ import {
   Info,
 } from "lucide-react";
 
+import { VoiceSelector } from "./voices/VoiceSelector";
+import { VoiceSelection } from "../types/voice";
+
 interface DubbingViewProps {
   devices: AudioDevice[];
-  voices: GeminiVoice[];
+  voices?: GeminiVoice[];
   dubbingInputIndex?: number;
   onSelectDubbingInput: (index: number) => void;
   headphonesIndex?: number;
   onSelectHeadphones: (index: number) => void;
   sourceLangLabel: string;
   sourceLangCode: string;
-  dubbingVoice: string;
-  onSelectDubbingVoice: (voice: string) => void;
+  dubbingVoice: VoiceSelection;
+  onSelectDubbingVoice: (voice: VoiceSelection) => void;
   duckingFactor: number;
   onDuckingChange: (factor: number) => void;
   jitterBufferMs: number;
@@ -42,7 +45,6 @@ interface DubbingViewProps {
 
 export const DubbingView = React.memo<DubbingViewProps>(({
   devices,
-  voices,
   dubbingInputIndex,
   onSelectDubbingInput,
   headphonesIndex,
@@ -222,26 +224,13 @@ export const DubbingView = React.memo<DubbingViewProps>(({
             </div>
 
             {/* Dubbing Voice Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  Голос українського дубляжу (Gemini Live)
-                </span>
-              </label>
-              <select
-                value={dubbingVoice}
-                onChange={(e) => onSelectDubbingVoice(e.target.value)}
-                disabled={isDubbing || isAnyOtherActive}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-              >
-                {voices.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <VoiceSelector
+              value={dubbingVoice}
+              onChange={onSelectDubbingVoice}
+              language="uk"
+              label="Голос українського дубляжу (TTS)"
+              disabled={isDubbing || isAnyOtherActive}
+            />
           </div>
         </section>
       </div>

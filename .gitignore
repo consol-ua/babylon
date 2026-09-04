@@ -9,5 +9,10 @@ backend/build
 *.pyc
 .DS_Store
 .env
+*.log
+backend/logs/
+.pytest_cache/
+backend/data/samples/
+backend/data/embeddings/
 
 .agents/

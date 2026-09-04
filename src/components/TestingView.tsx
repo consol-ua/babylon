@@ -14,7 +14,6 @@ import {
   Volume2,
   VolumeX,
   Mic,
-  Sparkles,
   CheckCircle2,
   Sliders,
   FileAudio,
@@ -27,9 +26,12 @@ import {
   Pause,
 } from "lucide-react";
 
+import { VoiceSelector } from "./voices/VoiceSelector";
+import { VoiceSelection } from "../types/voice";
+
 interface TestingViewProps {
   samples: SampleInfo[];
-  voices: GeminiVoice[];
+  voices?: GeminiVoice[];
   selectedSampleId: string;
   onSelectSample: (id: string) => void;
   devices: AudioDevice[];
@@ -38,10 +40,11 @@ interface TestingViewProps {
   headphonesIndex?: number;
   onSelectHeadphones: (index: number) => void;
   partnerLangLabel: string;
-  sampleVoice: string;
-  onSelectSampleVoice: (voice: string) => void;
-  micTestVoice: string;
-  onSelectMicTestVoice: (voice: string) => void;
+  partnerLangCode?: string;
+  sampleVoice: VoiceSelection;
+  onSelectSampleVoice: (voice: VoiceSelection) => void;
+  micTestVoice: VoiceSelection;
+  onSelectMicTestVoice: (voice: VoiceSelection) => void;
   duckingFactor: number;
   onDuckingChange: (factor: number) => void;
   jitterBufferMs: number;
@@ -55,7 +58,6 @@ interface TestingViewProps {
 
 export const TestingView = React.memo<TestingViewProps>(({
   samples,
-  voices,
   selectedSampleId,
   onSelectSample,
   devices,
@@ -64,6 +66,7 @@ export const TestingView = React.memo<TestingViewProps>(({
   headphonesIndex,
   onSelectHeadphones,
   partnerLangLabel,
+  partnerLangCode = "en",
   sampleVoice,
   onSelectSampleVoice,
   micTestVoice,
@@ -354,24 +357,13 @@ export const TestingView = React.memo<TestingViewProps>(({
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    Голос перекладу (AI)
-                  </label>
-                  <select
-                    value={sampleVoice}
-                    onChange={(e) => onSelectSampleVoice(e.target.value)}
-                    disabled={state.is_testing_active}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-medium"
-                  >
-                    {voices.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <VoiceSelector
+                  value={sampleVoice}
+                  onChange={onSelectSampleVoice}
+                  language="uk"
+                  label="Голос перекладу (AI)"
+                  disabled={state.is_testing_active}
+                />
               </div>
 
               <VuMeter
@@ -507,25 +499,14 @@ export const TestingView = React.memo<TestingViewProps>(({
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  Голос озвучки перекладу (AI)
-                </label>
-                <select
+                <VoiceSelector
                   value={micTestVoice}
-                  onChange={(e) => onSelectMicTestVoice(e.target.value)}
+                  onChange={onSelectMicTestVoice}
+                  language={partnerLangCode || "en"}
+                  label="Голос озвучки перекладу (AI)"
                   disabled={state.is_mic_test_active}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-medium"
-                >
-                  {voices.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
-            </div>
 
             <VuMeter
               label="Рівень мікрофона під час тесту"
@@ -602,7 +583,7 @@ export const TestingView = React.memo<TestingViewProps>(({
                     </button>
                     <div>
                       <h4 className="text-xs font-semibold text-slate-200">
-                        Озвучка для співрозмовника ({partnerLangLabel}) [Голос: {micTestVoice}]
+                        Озвучка для співрозмовника ({partnerLangLabel}) [Голос: {micTestVoice.voice_id}]
                       </h4>
                       <p className="text-[11px] text-slate-400">
                         Послухайте, як ваш перекладений голос звучатиме у дзвінку

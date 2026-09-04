@@ -1,0 +1,22 @@
+[
+  {
+    "id": "uk_lada",
+    "name": "Лада (Швидкий UK)",
+    "language": "uk",
+    "engine_type": "builtin",
+    "model_name": "uk_UA-lada-medium",
+    "reference_audio_path": null,
+    "speaker_id": 0,
+    "created_at": "2026-09-04T10:51:04.560349+00:00"
+  },
+  {
+    "id": "en_lessac",
+    "name": "Lessac (Natural EN)",
+    "language": "en",
+    "engine_type": "builtin",
+    "model_name": "en_US-lessac-medium",
+    "reference_audio_path": null,
+    "speaker_id": 0,
+    "created_at": "2026-09-04T10:51:04.560367+00:00"
+  }
+]

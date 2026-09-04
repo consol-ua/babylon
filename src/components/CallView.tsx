@@ -12,13 +12,15 @@ import {
   ArrowRight,
   PhoneForwarded,
   Sliders,
-  Sparkles,
   AlertTriangle,
 } from "lucide-react";
 
+import { VoiceSelector } from "./voices/VoiceSelector";
+import { VoiceSelection } from "../types/voice";
+
 interface CallViewProps {
   devices: AudioDevice[];
-  voices: GeminiVoice[];
+  voices?: GeminiVoice[];
   myMicIndex?: number;
   onSelectMyMic: (index: number) => void;
   callVirtualMicIndex?: number;
@@ -28,10 +30,11 @@ interface CallViewProps {
   headphonesIndex?: number;
   onSelectHeadphones: (index: number) => void;
   partnerLangLabel: string;
-  outgoingVoice: string;
-  onSelectOutgoingVoice: (voice: string) => void;
-  incomingVoice: string;
-  onSelectIncomingVoice: (voice: string) => void;
+  partnerLangCode?: string;
+  outgoingVoice: VoiceSelection;
+  onSelectOutgoingVoice: (voice: VoiceSelection) => void;
+  incomingVoice: VoiceSelection;
+  onSelectIncomingVoice: (voice: VoiceSelection) => void;
   duckingFactor: number;
   onDuckingChange: (factor: number) => void;
   jitterBufferMs: number;
@@ -43,7 +46,6 @@ interface CallViewProps {
 
 export const CallView = React.memo<CallViewProps>(({
   devices,
-  voices,
   myMicIndex,
   onSelectMyMic,
   callVirtualMicIndex,
@@ -53,6 +55,7 @@ export const CallView = React.memo<CallViewProps>(({
   headphonesIndex,
   onSelectHeadphones,
   partnerLangLabel,
+  partnerLangCode = "en",
   outgoingVoice,
   onSelectOutgoingVoice,
   incomingVoice,
@@ -162,24 +165,13 @@ export const CallView = React.memo<CallViewProps>(({
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  Голос для Zoom (AI)
-                </label>
-                <select
-                  value={outgoingVoice}
-                  onChange={(e) => onSelectOutgoingVoice(e.target.value)}
-                  disabled={state.is_call_active}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 font-medium"
-                >
-                  {voices.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <VoiceSelector
+                value={outgoingVoice}
+                onChange={onSelectOutgoingVoice}
+                language={partnerLangCode || "en"}
+                label="Голос для Zoom (AI)"
+                disabled={state.is_call_active}
+              />
             </div>
 
             <div className="space-y-1">
@@ -222,7 +214,7 @@ export const CallView = React.memo<CallViewProps>(({
               themeColor="indigo"
             />
             <TranscriptBox
-              title={`Переклад у Zoom (${partnerLangLabel}) [${outgoingVoice}]`}
+              title={`Переклад у Zoom (${partnerLangLabel}) [${outgoingVoice.voice_id}]`}
               text={state.outgoing.translated_text}
               history={state.outgoing.translated_history}
               placeholder="Синхронний AI-переклад транслюватиметься сюди..."
@@ -274,24 +266,13 @@ export const CallView = React.memo<CallViewProps>(({
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                  Голос у навушники (AI)
-                </label>
-                <select
-                  value={incomingVoice}
-                  onChange={(e) => onSelectIncomingVoice(e.target.value)}
-                  disabled={state.is_call_active}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 font-medium"
-                >
-                  {voices.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <VoiceSelector
+                value={incomingVoice}
+                onChange={onSelectIncomingVoice}
+                language="uk"
+                label="Голос у навушники (AI)"
+                disabled={state.is_call_active}
+              />
             </div>
 
             <div className="space-y-1">
@@ -376,7 +357,7 @@ export const CallView = React.memo<CallViewProps>(({
               themeColor="amber"
             />
             <TranscriptBox
-              title={`Переклад у навушниках (Українська) [${incomingVoice}]`}
+              title={`Переклад у навушниках (Українська) [${incomingVoice.voice_id}]`}
               text={state.incoming.translated_text}
               history={state.incoming.translated_history}
               placeholder="Український голос та переклад з'являться тут..."
