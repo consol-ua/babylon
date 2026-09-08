@@ -153,7 +153,9 @@ class GeminiLiveAudioSession:
                 f"Do not wait for full sentences or long pauses before starting speech synthesis. "
                 f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
                 f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
-                f"Only synthesize accurate, fluent speech in Ukrainian. Do not produce meta-commentary, explanations, or conversational filler."
+                f"Only synthesize accurate, fluent speech in Ukrainian. Do not produce meta-commentary, explanations, or conversational filler. "
+                f"CRITICAL FOR UKRAINIAN: Always phonetically transliterate all foreign brand names, technical terms, and English words into Ukrainian Cyrillic (e.g., YouTube -> Ютуб, Reddit -> Реддіт, Gemini -> Джеміні, Flash -> Флеш, X -> Ікс). "
+                f"Always write out all numbers and digits in full Ukrainian words in Cyrillic (e.g., 1.5 -> півтора or один і п'ять). Do not output Latin characters or raw digits."
             )
 
         system_instruction = types.Content(

@@ -13,6 +13,7 @@ import {
   Check,
 } from "lucide-react";
 import { AudioRecorderWidget } from "./AudioRecorderWidget";
+import { convertFileTo16kWav } from "./wavUtils";
 import { useVoiceProfiles } from "../../hooks/useVoiceProfiles";
 import { VoiceProfile } from "../../types/voice";
 
@@ -141,9 +142,9 @@ export const VoiceProfileModal: React.FC<VoiceProfileModalProps> = React.memo(({
   }, []);
 
   // File Upload Handlers
-  const handleFileSelect = useCallback((file: File) => {
+  const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith("audio/") && !file.name.match(/\.(wav|mp3|m4a|ogg|flac)$/i)) {
-      setErrorMessage("Будь ласка, оберіть аудіофайл (.wav, .mp3, .m4a, .ogg)");
+      setErrorMessage("Будь ласка, оберіть аудіофайл (.wav, .mp3, .m4a, .ogg, .flac)");
       return;
     }
     if (file.size > 30 * 1024 * 1024) {
@@ -154,10 +155,23 @@ export const VoiceProfileModal: React.FC<VoiceProfileModalProps> = React.memo(({
     if (uploadedAudioUrl) {
       URL.revokeObjectURL(uploadedAudioUrl);
     }
-    const url = URL.createObjectURL(file);
-    setUploadedFile(file);
-    setUploadedAudioUrl(url);
-    setErrorMessage(null);
+
+    try {
+      // Normalize any audio file to 16kHz mono WAV for guaranteed backend compatibility
+      const wavBlob = await convertFileTo16kWav(file);
+      const cleanFileName = `${file.name.replace(/\.[^/.]+$/, "")}.wav`;
+      const wavFile = new File([wavBlob], cleanFileName, { type: "audio/wav" });
+      const url = URL.createObjectURL(wavBlob);
+      setUploadedFile(wavFile);
+      setUploadedAudioUrl(url);
+      setErrorMessage(null);
+    } catch {
+      // Direct fallback
+      const url = URL.createObjectURL(file);
+      setUploadedFile(file);
+      setUploadedAudioUrl(url);
+      setErrorMessage(null);
+    }
   }, [uploadedAudioUrl]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -343,7 +357,7 @@ export const VoiceProfileModal: React.FC<VoiceProfileModalProps> = React.memo(({
 
       if (activeTab === "record" && recordedBlob) {
         sampleData = recordedBlob;
-        filename = `${newProfile.id}_sample.webm`;
+        filename = `${newProfile.id}_sample.wav`;
       } else if (activeTab === "upload" && uploadedFile) {
         sampleData = uploadedFile;
         filename = uploadedFile.name;

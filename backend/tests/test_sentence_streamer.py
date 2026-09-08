@@ -67,6 +67,15 @@ def test_token_streaming_incremental():
     assert streamer.buffer == ""
 
 
+def test_streamer_feed_and_push_token_aliases():
+    """Verify feed() and push_token() behave identically to push()."""
+    streamer = PunctuationSentenceStreamer()
+    assert streamer.feed("Перша фраза, ") == ["Перша фраза,"]
+    assert streamer.push_token("друга фраза.") == ["друга фраза."]
+    assert streamer.buffer == ""
+
+
+
 def test_numbers_handling():
     """Verify decimal numbers and thousand separators are preserved without premature splitting."""
     streamer = PunctuationSentenceStreamer()

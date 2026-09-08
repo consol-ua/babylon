@@ -137,57 +137,76 @@ class ClonedVoiceProvider(BaseTTSProvider):
             logger.error("Failed extracting speaker embedding from %s: %s", path_str, err)
             return None
 
-    def _synthesize_conditioned(
+    async def _synthesize_conditioned(
         self, text: str, profile: VoiceProfile, embedding: np.ndarray
     ) -> np.ndarray:
         """
         Synthesize speech conditioned on the speaker latent embedding (pitch & spectral tilt).
+        Conditions the neural base synthesizer by selecting appropriate base speaker and
+        applying vocal pitch adjustments.
         """
         mean_f0 = float(embedding[0]) if len(embedding) > 0 and embedding[0] > 50 else 165.0
         spectral_centroid = float(embedding[2]) if len(embedding) > 2 and embedding[2] > 200 else 1500.0
 
+        # Choose best matching base speaker: Mykyta (1) for masculine pitch, Lada (0) for feminine pitch
+        speaker_id = 1 if mean_f0 < 165.0 else 0
+        conditioned_profile = profile.model_copy(update={"speaker_id": speaker_id})
+
+        base_pcm = await self.base_provider.synthesize(text, conditioned_profile)
+        if len(base_pcm) > 0:
+            # Shift pitch gently towards reference speaker f0
+            base_nominal_f0 = 135.0 if speaker_id == 1 else 215.0
+            pitch_ratio = float(np.clip(mean_f0 / base_nominal_f0, 0.80, 1.25))
+
+            if abs(pitch_ratio - 1.0) >= 0.04:
+                new_len = max(1, int(len(base_pcm) / pitch_ratio))
+                indices = np.linspace(0, len(base_pcm) - 1, new_len)
+                shifted = np.interp(indices, np.arange(len(base_pcm)), base_pcm.astype(np.float32))
+                base_pcm = np.clip(shifted, -32768, 32767).astype(np.int16)
+
+            return base_pcm
+
+        return self._generate_acoustic_fallback(text, profile, mean_f0, spectral_centroid)
+
+    def _generate_acoustic_fallback(
+        self, text: str, profile: VoiceProfile, mean_f0: float, spectral_centroid: float
+    ) -> np.ndarray:
+        """Lightweight acoustic fallback if base provider returns empty."""
         stripped = text.strip()
         if not stripped:
             return np.zeros(0, dtype=np.int16)
 
         words = stripped.split()
         num_words = max(1, len(words))
-
         duration = max(0.35, min(10.0, num_words * 0.32 + len(stripped) * 0.02))
         total_samples = int(duration * self.SAMPLE_RATE)
         t = np.linspace(0.0, duration, total_samples, endpoint=False)
 
-        # Apply speaker's customized pitch contour
         is_question = stripped.endswith("?")
-        if is_question:
-            f0_contour = mean_f0 * (1.0 + 0.25 * (t / duration) ** 2)
-        else:
-            f0_contour = mean_f0 * (1.05 - 0.12 * (t / duration))
-
+        f0_contour = (
+            mean_f0 * (1.0 + 0.25 * (t / duration) ** 2)
+            if is_question
+            else mean_f0 * (1.05 - 0.12 * (t / duration))
+        )
         phase = np.cumsum(2.0 * np.pi * f0_contour / self.SAMPLE_RATE)
 
-        # Condition harmonic rolloff on spectral centroid (brightness/timbre)
         brightness_factor = max(0.5, min(2.0, spectral_centroid / 1500.0))
-        h1 = np.sin(phase)
-        h2 = (0.50 * brightness_factor) * np.sin(2.0 * phase)
-        h3 = (0.25 * brightness_factor) * np.sin(3.0 * phase)
-        h4 = (0.12 * brightness_factor) * np.sin(4.0 * phase)
-        voice_wave = h1 + h2 + h3 + h4
-
-        # Syllable envelope
-        syllable_rate = 4.5
-        syllable_env = 0.5 + 0.5 * np.cos(2.0 * np.pi * syllable_rate * t)
-        syllable_env = np.clip(syllable_env ** 1.5, 0.05, 1.0)
+        voice_wave = (
+            np.sin(phase)
+            + (0.50 * brightness_factor) * np.sin(2.0 * phase)
+            + (0.25 * brightness_factor) * np.sin(3.0 * phase)
+            + (0.12 * brightness_factor) * np.sin(4.0 * phase)
+        )
+        syllable_env = np.clip((0.5 + 0.5 * np.cos(2.0 * np.pi * 4.5 * t)) ** 1.5, 0.05, 1.0)
         signal_wave = voice_wave * syllable_env
 
-        # Windowing
-        fade_in_samples = min(int(0.02 * self.SAMPLE_RATE), total_samples // 4)
-        fade_out_samples = min(int(0.03 * self.SAMPLE_RATE), total_samples // 4)
         envelope = np.ones(total_samples, dtype=np.float32)
-        if fade_in_samples > 0:
-            envelope[:fade_in_samples] = np.linspace(0.0, 1.0, fade_in_samples)
-        if fade_out_samples > 0:
-            envelope[-fade_out_samples:] = np.linspace(1.0, 0.0, fade_out_samples)
+        fade_in = min(int(0.02 * self.SAMPLE_RATE), total_samples // 4)
+        fade_out = min(int(0.03 * self.SAMPLE_RATE), total_samples // 4)
+        if fade_in > 0:
+            envelope[:fade_in] = np.linspace(0.0, 1.0, fade_in)
+        if fade_out > 0:
+            envelope[-fade_out:] = np.linspace(1.0, 0.0, fade_out)
 
         audio_float = signal_wave * envelope
         max_val = np.max(np.abs(audio_float))
@@ -212,7 +231,7 @@ class ClonedVoiceProvider(BaseTTSProvider):
                     profile.name,
                     profile.reference_audio_path,
                 )
-                return self._synthesize_conditioned(text, profile, embedding)
+                return await self._synthesize_conditioned(text, profile, embedding)
 
         # Fallback to base provider
         logger.info(

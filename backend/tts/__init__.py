@@ -10,6 +10,7 @@ from .models import (
     CreateVoiceProfilePayload,
     TestSynthesizePayload,
 )
+from .normalizer import normalize_ukrainian_text
 from .piper_provider import PiperTTSProvider
 from .profile_storage import VoiceProfileStorage
 from .sentence_streamer import PunctuationSentenceStreamer
@@ -26,4 +27,5 @@ __all__ = [
     "ClonedVoiceProvider",
     "VoiceProfileStorage",
     "LocalTTSManager",
+    "normalize_ukrainian_text",
 ]

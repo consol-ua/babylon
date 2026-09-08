@@ -247,7 +247,18 @@ class VoiceProfileStorage:
             except Exception as err:
                 raise ValueError(f"Invalid WAV audio data: {err}") from err
         else:
-            # Assume 16kHz 16-bit mono raw PCM
+            # Check for compressed formats that shouldn't be read as raw PCM
+            if (
+                audio_bytes[:4] in (b"\x1a\x45\xdf\xa3", b"OggS", b"fLaC")
+                or b"ftyp" in audio_bytes[:12]
+                or audio_bytes[:3] == b"ID3"
+                or (len(audio_bytes) > 2 and audio_bytes[:2] == b"\xff\xfb")
+            ):
+                raise ValueError(
+                    "Непідтримуваний стиснений формат аудіо. Будь ласка, завантажте аудіо у форматі WAV."
+                )
+
+            # Assume 16kHz 16-bit mono raw PCM (for backward compatibility and test mocks)
             samples = np.frombuffer(audio_bytes, dtype=np.int16)
             duration = float(len(samples)) / 16000.0
             if duration < 3.0 or duration > 30.0:

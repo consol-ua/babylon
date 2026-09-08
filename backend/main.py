@@ -340,7 +340,7 @@ def on_out_trans(text: str) -> None:
     if text:
         update_transcript_history(state.outgoing_trans_history, text)
         if state.outgoing_voice_selection.mode in ("local", "cloned"):
-            clauses = outgoing_streamer.feed(text)
+            clauses = outgoing_streamer.push(text)
             for clause in clauses:
                 outgoing_tts_queue.put_nowait(clause)
 
@@ -354,7 +354,7 @@ def on_in_trans(text: str) -> None:
     if text:
         update_transcript_history(state.incoming_trans_history, text)
         if state.incoming_voice_selection.mode in ("local", "cloned"):
-            clauses = incoming_streamer.feed(text)
+            clauses = incoming_streamer.push(text)
             for clause in clauses:
                 incoming_tts_queue.put_nowait(clause)
 
@@ -364,14 +364,14 @@ def on_ai_error(error_msg: str, error_type: str) -> None:
 
 def on_out_turn_complete() -> None:
     if state.outgoing_voice_selection.mode in ("local", "cloned"):
-        rem = outgoing_streamer.clear()
+        rem = outgoing_streamer.flush()
         if rem:
             outgoing_tts_queue.put_nowait(rem)
     audio_engine.outgoing_playback_buffer.flush()
 
 def on_in_turn_complete() -> None:
     if state.incoming_voice_selection.mode in ("local", "cloned"):
-        rem = incoming_streamer.clear()
+        rem = incoming_streamer.flush()
         if rem:
             incoming_tts_queue.put_nowait(rem)
     audio_engine.incoming_playback_buffer.flush()

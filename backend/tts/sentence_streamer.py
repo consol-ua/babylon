@@ -49,6 +49,11 @@ class PunctuationSentenceStreamer:
         """Alias for push."""
         return self.push(token)
 
+    def feed(self, text: str) -> List[str]:
+        """Alias for push."""
+        return self.push(text)
+
+
     def _extract_clauses(self) -> List[str]:
         """Extract completed clauses from buffer based on punctuation boundaries."""
         clauses: List[str] = []

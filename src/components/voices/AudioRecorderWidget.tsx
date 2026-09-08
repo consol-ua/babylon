@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { encodeWav, resampleAudio } from "./wavUtils";
 
 export interface AudioRecorderWidgetProps {
   onAudioRecorded: (blob: Blob, durationSeconds: number) => void;
@@ -35,17 +36,19 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
 
   // References
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const pcmChunksRef = useRef<Float32Array[]>([]);
+  const isRecordingRef = useRef<boolean>(false);
   const startTimeRef = useRef<number>(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   // Clean up AudioContext & MediaStream
   const cleanupAudio = useCallback(() => {
+    isRecordingRef.current = false;
     if (animFrameRef.current !== null) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
@@ -53,6 +56,14 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
     if (timerIntervalRef.current !== null) {
       window.clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
+    }
+    if (scriptProcessorRef.current) {
+      try {
+        scriptProcessorRef.current.disconnect();
+      } catch {
+        // ignore
+      }
+      scriptProcessorRef.current = null;
     }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -75,14 +86,40 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
 
   // Stop recording handler
   const stopRecording = useCallback(() => {
-    if (!isRecording) return;
+    if (!isRecordingRef.current) return;
+    isRecordingRef.current = false;
     setIsRecording(false);
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+    const finalDuration = Math.max(0.1, (performance.now() - startTimeRef.current) / 1000);
+    const audioCtx = audioContextRef.current;
+    const sampleRate = audioCtx ? audioCtx.sampleRate : 16000;
+
+    // Flatten collected Float32 PCM chunks
+    const chunks = pcmChunksRef.current;
+    let totalSamples = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      totalSamples += chunks[i].length;
     }
+
+    if (totalSamples > 0) {
+      const merged = new Float32Array(totalSamples);
+      let offset = 0;
+      for (let i = 0; i < chunks.length; i++) {
+        merged.set(chunks[i], offset);
+        offset += chunks[i].length;
+      }
+
+      // Resample down to pristine 16kHz mono and encode into RIFF WAV Blob
+      const resampled = resampleAudio(merged, sampleRate, 16000);
+      const wavBlob = encodeWav(resampled, 16000);
+      setRecordedBlob(wavBlob);
+      const url = URL.createObjectURL(wavBlob);
+      setAudioUrl(url);
+      onAudioRecorded(wavBlob, Math.round(finalDuration * 10) / 10);
+    }
+
     cleanupAudio();
-  }, [isRecording, cleanupAudio]);
+  }, [cleanupAudio, onAudioRecorded]);
 
   // Start recording
   const startRecording = useCallback(async () => {
@@ -92,54 +129,28 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
     }
-    chunksRef.current = [];
+    pcmChunksRef.current = [];
     setElapsedSeconds(0);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
+      // 1. Acquire mic stream with graceful fallback constraints
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: { ideal: 1 },
+            sampleRate: { ideal: 16000 },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       mediaStreamRef.current = stream;
 
-      // Select supported MIME type
-      let mimeType = "audio/webm;codecs=opus";
-      if (typeof MediaRecorder !== "undefined") {
-        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-          mimeType = "audio/webm;codecs=opus";
-        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-          mimeType = "audio/webm";
-        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-          mimeType = "audio/mp4";
-        } else if (MediaRecorder.isTypeSupported("audio/wav")) {
-          mimeType = "audio/wav";
-        }
-      }
-
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e: BlobEvent) => {
-        if (e.data && e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        const finalDuration = (performance.now() - startTimeRef.current) / 1000;
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        setRecordedBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        onAudioRecorded(blob, Math.round(finalDuration * 10) / 10);
-      };
-
-      // Set up Web Audio API Volume Analyzer
+      // 2. Set up Web Audio Context & analyzer
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -153,8 +164,19 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
       sourceNode.connect(analyser);
       analyserRef.current = analyser;
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      // 3. Set up ScriptProcessor for direct uncompressed PCM capture
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      scriptProcessorRef.current = processor;
+      processor.onaudioprocess = (e: AudioProcessingEvent) => {
+        if (!isRecordingRef.current) return;
+        const channel = e.inputBuffer.getChannelData(0);
+        pcmChunksRef.current.push(new Float32Array(channel));
+      };
+      sourceNode.connect(processor);
+      processor.connect(audioCtx.destination);
 
+      // 4. Volume meter render loop
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
       const updateVolumeLoop = () => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
@@ -164,7 +186,6 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
           sum += dataArray[i];
         }
         const avg = sum / dataArray.length;
-        // Normalize 0-255 to 0-100% with a sensible perceptual curve
         const levelPct = Math.min(100, Math.round((avg / 120) * 100));
         setVolumeLevel(levelPct);
 
@@ -172,12 +193,11 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
       };
       animFrameRef.current = requestAnimationFrame(updateVolumeLoop);
 
-      // Start Recorder
-      recorder.start(100);
+      // 5. Start timer and mark recording active
+      isRecordingRef.current = true;
       startTimeRef.current = performance.now();
       setIsRecording(true);
 
-      // Timer Interval
       timerIntervalRef.current = window.setInterval(() => {
         const currentElapsed = (performance.now() - startTimeRef.current) / 1000;
         setElapsedSeconds(currentElapsed);
@@ -194,7 +214,8 @@ export const AudioRecorderWidget: React.FC<AudioRecorderWidgetProps> = React.mem
       cleanupAudio();
       setIsRecording(false);
     }
-  }, [maxDurationSeconds, onAudioRecorded, stopRecording, cleanupAudio, audioUrl]);
+  }, [maxDurationSeconds, cleanupAudio, stopRecording, audioUrl]);
+
 
   // Handle Play / Pause of recorded preview
   const togglePlayRecorded = useCallback(() => {

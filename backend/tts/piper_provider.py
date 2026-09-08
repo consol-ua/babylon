@@ -19,16 +19,24 @@ try:
 except ImportError:
     signal = None
 
+try:
+    from piper.voice import PiperVoice
+    from piper.config import SynthesisConfig
+except ImportError:
+    PiperVoice = None
+    SynthesisConfig = None
+
 from .base import BaseTTSProvider
 from .models import VoiceProfile
+from .normalizer import normalize_ukrainian_text
 
 logger = logging.getLogger("piper_tts_provider")
 
 
 class PiperTTSProvider(BaseTTSProvider):
     """
-    Piper TTS Provider executing local ONNX voice models with onnxruntime.
-    Includes acoustic synthesis fallback for testing and missing model environments.
+    Piper TTS Provider executing local ONNX voice models with onnxruntime and piper-tts.
+    Includes macOS native speech and acoustic synthesis fallbacks for missing model environments.
     """
 
     def __init__(self, models_dir: Optional[Union[str, Path]] = None) -> None:
@@ -40,6 +48,8 @@ class PiperTTSProvider(BaseTTSProvider):
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self._sessions: Dict[str, ort.InferenceSession] = {}
         self._configs: Dict[str, dict] = {}
+        self._piper_voices: Dict[str, PiperVoice] = {}
+
 
     def _get_model_paths(self, model_name: str) -> tuple[Path, Path]:
         """Resolve .onnx and .onnx.json file paths."""
@@ -171,60 +181,120 @@ class PiperTTSProvider(BaseTTSProvider):
             interpolated = np.interp(indices, np.arange(len(audio)), audio)
             return self.ensure_pcm16_mono(interpolated)
 
-    async def synthesize(self, text: str, profile: VoiceProfile) -> np.ndarray:
+    def _load_piper_voice(self, model_name: str) -> Optional[PiperVoice]:
+        """Load or retrieve cached PiperVoice instance for neural synthesis."""
+        if PiperVoice is None:
+            return None
+
+        if model_name in self._piper_voices:
+            return self._piper_voices[model_name]
+
+        onnx_path, config_path = self._get_model_paths(model_name)
+        if not onnx_path.exists() or not config_path.exists():
+            return None
+
+        try:
+            voice = PiperVoice.load(str(onnx_path), str(config_path))
+            self._piper_voices[model_name] = voice
+            logger.info("Loaded Piper neural voice instance for model: %s", model_name)
+            return voice
+        except Exception as err:
+            logger.warning("Failed loading PiperVoice instance for %s: %s", model_name, err)
+            return None
+
+    def _synthesize_macos_say(self, text: str, language: str) -> Optional[np.ndarray]:
         """
-        Synthesize text into a 16kHz int16 mono PCM numpy array using Piper ONNX or fallback.
+        Synthesize speech using macOS native 'say' command to 16kHz mono WAV.
+        Provides zero-latency, high quality natural speech fallback.
         """
-        if not text.strip():
+        import platform
+        import shutil
+        import subprocess
+        import tempfile
+        import wave
+
+        if platform.system() != "Darwin" or not shutil.which("say"):
+            return None
+
+        clean_text = text.strip()
+        if not clean_text:
             return np.zeros(0, dtype=np.int16)
 
-        model_name = profile.model_name or "uk_UA-lada-medium"
-        loaded = self._load_session(model_name)
+        # Lesya for Ukrainian, Samantha for English / others
+        voice = "Lesya" if language.lower() == "uk" else "Samantha"
 
-        if loaded is None:
-            # Clean fallback with clear logging
-            logger.info("Using acoustic synthesis fallback for profile '%s'.", profile.id)
-            return self._generate_acoustic_fallback(text, profile)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+            tmp_path = tmp_file.name
 
-        session, config = loaded
         try:
-            audio_sample_rate = config.get("audio", {}).get("sample_rate", 22050)
-            phoneme_id_map = config.get("phoneme_id_map", {})
+            cmd = ["say", "-v", voice, "-o", tmp_path, "--data-format=LEI16@16000", clean_text]
+            res = subprocess.run(cmd, capture_output=True, timeout=5.0)
+            if res.returncode != 0 or not Path(tmp_path).exists():
+                return None
 
-            # Prepare basic character/phoneme token IDs
-            tokens = [phoneme_id_map.get(ch, [0])[0] if isinstance(phoneme_id_map.get(ch), list)
-                      else phoneme_id_map.get(ch, 0) for ch in text.lower()]
-            if not tokens:
-                tokens = [0]
+            with wave.open(tmp_path, "rb") as wf:
+                nframes = wf.getnframes()
+                raw_bytes = wf.readframes(nframes)
+                samples = np.frombuffer(raw_bytes, dtype=np.int16)
+                return samples
+        except Exception as e:
+            logger.warning("macOS say fallback failed: %s", e)
+            return None
+        finally:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
-            phoneme_ids = np.array([tokens], dtype=np.int64)
-            phoneme_lengths = np.array([phoneme_ids.shape[1]], dtype=np.int64)
-            scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+    async def synthesize(self, text: str, profile: VoiceProfile) -> np.ndarray:
+        """
+        Synthesize text into a 16kHz int16 mono PCM numpy array using:
+        1. Local Piper ONNX neural voice (if available)
+        2. macOS native speech synthesis ('say' with Lesya/Samantha)
+        3. Acoustic harmonic fallback (for headless CI testing)
+        """
+        clean_text = text.strip()
+        if not clean_text:
+            return np.zeros(0, dtype=np.int16)
 
-            inputs: dict = {
-                "input": phoneme_ids,
-                "input_lengths": phoneme_lengths,
-                "scales": scales,
-            }
+        model_name = profile.model_name or ("uk_UA-lada-medium" if profile.language == "uk" else "en_US-lessac-medium")
 
-            input_names = [inp.name for inp in session.get_inputs()]
-            if "sid" in input_names:
-                speaker_id = profile.speaker_id if profile.speaker_id is not None else 0
-                inputs["sid"] = np.array([speaker_id], dtype=np.int64)
+        # 1. Primary: Neural Piper ONNX synthesis
+        voice = self._load_piper_voice(model_name)
+        if voice is not None:
+            try:
+                if profile.language == "uk" or "lada" in (profile.model_name or ""):
+                    txt_input = normalize_ukrainian_text(clean_text)
+                else:
+                    txt_input = clean_text
 
-            outputs = session.run(None, inputs)
-            raw_audio = outputs[0].flatten()
+                if not txt_input:
+                    return np.zeros(0, dtype=np.int16)
 
-            resampled = self._resample_audio(raw_audio, audio_sample_rate)
-            return resampled
+                syn_cfg = None
+                if profile.speaker_id is not None and SynthesisConfig is not None:
+                    syn_cfg = SynthesisConfig(speaker_id=profile.speaker_id)
 
-        except Exception as err:
-            logger.warning(
-                "Inference failed for Piper model %s: %s. Falling back to acoustic synthesis.",
-                model_name,
-                err,
-            )
-            return self._generate_acoustic_fallback(text, profile)
+                chunks = list(voice.synthesize(txt_input, syn_config=syn_cfg))
+                if chunks:
+                    raw_int16 = np.concatenate([c.audio_int16_array for c in chunks])
+                    # Verify output audio contains real voice signal and not degenerate silence
+                    if len(raw_int16) > 0 and np.max(np.abs(raw_int16)) > 50:
+                        sr = chunks[0].sample_rate
+                        return self._resample_audio(raw_int16, sr)
+                    else:
+                        logger.warning("Piper produced near-silent audio for '%s', trying fallback.", txt_input)
+            except Exception as err:
+                logger.warning("Piper neural synthesis failed for %s: %s", model_name, err)
+
+        # 2. High-quality offline fallback: macOS native speech synthesis
+        macos_audio = self._synthesize_macos_say(clean_text, profile.language)
+        if macos_audio is not None and len(macos_audio) > 0:
+            return macos_audio
+
+        # 3. Clean acoustic fallback (for mock unit tests)
+        logger.info("Using acoustic synthesis fallback for profile '%s'.", profile.id)
+        return self._generate_acoustic_fallback(clean_text, profile)
 
     async def synthesize_stream(
         self, text: str, profile: VoiceProfile, chunk_duration_ms: int = 50
