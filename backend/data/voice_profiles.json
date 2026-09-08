@@ -18,5 +18,15 @@
     "reference_audio_path": null,
     "speaker_id": 0,
     "created_at": "2026-09-04T10:51:04.560367+00:00"
+  },
+  {
+    "id": "мій_голос_3843",
+    "name": "Мій голос",
+    "language": "uk",
+    "engine_type": "cloned",
+    "model_name": null,
+    "reference_audio_path": "/Users/admin/Desktop/myProject/backend/data/samples/sample_мій_голос_3843.wav",
+    "speaker_id": 0,
+    "created_at": "2026-09-08T18:57:23.299196+00:00"
   }
 ]

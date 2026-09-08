@@ -307,7 +307,7 @@ class ConnectionManager:
         self.active_connections.add(websocket)
 
     def disconnect(self, websocket: WebSocket) -> None:
-        self.active_connections.remove(websocket)
+        self.active_connections.discard(websocket)
 
     async def broadcast(self, message: dict) -> None:
         for connection in list(self.active_connections):
@@ -933,7 +933,11 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, asyncio.CancelledError):
+        pass
+    except Exception:
+        pass
+    finally:
         manager.disconnect(websocket)
 
 if __name__ == "__main__":

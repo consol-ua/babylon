@@ -85,3 +85,14 @@ def test_voice_profiles_crud():
     del_res = client.delete(f"/api/voice-profiles/{profile_id}")
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "deleted"
+
+def test_websocket_disconnect_resilience():
+    from main import manager
+    with client.websocket_connect("/ws") as ws:
+        # Simulate simultaneous discard by broadcast or closure
+        for sock in list(manager.active_connections):
+            manager.disconnect(sock)
+        # Verify disconnect is idempotent and doesn't raise KeyError
+        for sock in list(manager.active_connections):
+            manager.disconnect(sock)
+
