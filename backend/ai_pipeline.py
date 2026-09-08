@@ -118,6 +118,7 @@ class GeminiLiveAudioSession:
         self.first_input_audio_time = 0.0
         self.first_audio_received_time = 0.0
         self.measured_latency_ms = 0
+        self._resample_buffer_24k = bytearray()
 
         if not self.client or not self.api_key:
             self._report_error(
@@ -139,23 +140,16 @@ class GeminiLiveAudioSession:
 
         if self.channel_name == "outgoing":
             system_prompt = (
-                f"You are a dedicated real-time simultaneous voice interpreter translating spoken Ukrainian into {self.target_lang}. "
-                f"Translate immediately and continuously as the user speaks, phrase-by-phrase, with minimal latency. "
-                f"Do not wait for full sentences or long pauses before starting speech synthesis. "
-                f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
-                f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
-                f"Only synthesize accurate speech in {self.target_lang}. Do not produce meta-commentary, explanations, or conversational filler."
+                f"Simultaneous interpreter translating into {self.target_lang}. "
+                f"Translate immediately and continuously. "
+                f"Do not produce meta-commentary, markdown, or emojis."
             )
         else:
             system_prompt = (
-                f"You are a dedicated real-time simultaneous voice interpreter translating incoming speech into Ukrainian (uk). "
-                f"Translate immediately and continuously as the speaker speaks, phrase-by-phrase, with minimal latency. "
-                f"Do not wait for full sentences or long pauses before starting speech synthesis. "
-                f"You MUST strictly maintain the assigned speaker voice '{self.voice_name}' across all speech turns, sentences, and pauses. "
-                f"Never switch voices, alter timbre, change pitch, or change gender after pauses or silence. "
-                f"Only synthesize accurate, fluent speech in Ukrainian. Do not produce meta-commentary, explanations, or conversational filler. "
-                f"CRITICAL FOR UKRAINIAN: Always phonetically transliterate all foreign brand names, technical terms, and English words into Ukrainian Cyrillic (e.g., YouTube -> Ютуб, Reddit -> Реддіт, Gemini -> Джеміні, Flash -> Флеш, X -> Ікс). "
-                f"Always write out all numbers and digits in full Ukrainian words in Cyrillic (e.g., 1.5 -> півтора or один і п'ять). Do not output Latin characters or raw digits."
+                f"Simultaneous interpreter translating into Ukrainian (uk). "
+                f"Translate immediately and continuously. "
+                f"Transliterate ALL foreign words and brand names into Cyrillic (e.g., YouTube -> Ютуб). "
+                f"Write numbers as words. Do not use Latin characters, emojis, or markdown."
             )
 
         system_instruction = types.Content(
@@ -185,21 +179,26 @@ class GeminiLiveAudioSession:
 
                 async def send_audio_worker() -> None:
                     """Continuously stream audio chunks to Gemini."""
+                    send_buffer = bytearray()
                     while self.is_running:
                         try:
                             chunk = await input_queue.get()
                             if chunk is None or not self.is_running:
                                 break
-
-                            if self.first_input_audio_time == 0.0:
-                                self.first_input_audio_time = time.time()
-
-                            await session.send_realtime_input(
-                                audio=types.Blob(
-                                    data=chunk,
-                                    mime_type=f"audio/pcm;rate={self.sample_rate}",
+                                
+                            send_buffer.extend(chunk)
+                            # Batch up to 3 chunks (~96ms at 512 samples) to reduce framing overhead
+                            if len(send_buffer) >= 3072:
+                                if self.first_input_audio_time == 0.0:
+                                    self.first_input_audio_time = time.time()
+                                    
+                                await session.send_realtime_input(
+                                    audio=types.Blob(
+                                        data=bytes(send_buffer),
+                                        mime_type=f"audio/pcm;rate={self.sample_rate}",
+                                    )
                                 )
-                            )
+                                send_buffer.clear()
                         except asyncio.CancelledError:
                             break
                         except Exception as e:
@@ -230,16 +229,23 @@ class GeminiLiveAudioSession:
                                                 (self.first_audio_received_time - self.first_input_audio_time) * 1000
                                             )
 
-                                        raw_pcm_24k = part.inline_data.data
-                                        audio_24k = np.frombuffer(raw_pcm_24k, dtype=np.int16)
+                                        self._resample_buffer_24k.extend(part.inline_data.data)
                                         
-                                        # Resample 24kHz down to 16kHz
-                                        if len(audio_24k) > 0:
+                                        # 24kHz to 16kHz is a 3:2 ratio. 3 int16 samples = 6 bytes.
+                                        # Process exact multiples of 6 bytes to preserve phase.
+                                        valid_bytes = (len(self._resample_buffer_24k) // 6) * 6
+                                        if valid_bytes > 0:
+                                            chunk_to_process = self._resample_buffer_24k[:valid_bytes]
+                                            self._resample_buffer_24k = self._resample_buffer_24k[valid_bytes:]
+                                            
+                                            audio_24k = np.frombuffer(chunk_to_process, dtype=np.int16)
                                             num_samples_16k = int(len(audio_24k) * 2 / 3)
+                                            
                                             indices = np.arange(num_samples_16k) * 1.5
                                             idx_floor = indices.astype(np.intp)
                                             idx_floor = np.clip(idx_floor, 0, len(audio_24k) - 2)
                                             frac = (indices - idx_floor).astype(np.float32)
+                                            
                                             audio_16k = ((1.0 - frac) * audio_24k[idx_floor] + frac * audio_24k[idx_floor + 1]).astype(np.int16)
                                             
                                             if self.on_audio_chunk:
