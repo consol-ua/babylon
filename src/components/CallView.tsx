@@ -13,6 +13,7 @@ import {
   PhoneForwarded,
   Sliders,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 
 import { VoiceSelector } from "./voices/VoiceSelector";
@@ -29,6 +30,8 @@ interface CallViewProps {
   onSelectCallInput: (index: number) => void;
   headphonesIndex?: number;
   onSelectHeadphones: (index: number) => void;
+  onRefreshDevices?: () => void;
+  isRefreshingDevices?: boolean;
   partnerLangLabel: string;
   partnerLangCode?: string;
   outgoingVoice: VoiceSelection;
@@ -54,6 +57,8 @@ export const CallView = React.memo<CallViewProps>(({
   onSelectCallInput,
   headphonesIndex,
   onSelectHeadphones,
+  onRefreshDevices,
+  isRefreshingDevices = false,
   partnerLangLabel,
   partnerLangCode = "en",
   outgoingVoice,
@@ -147,10 +152,24 @@ export const CallView = React.memo<CallViewProps>(({
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Mic className="w-3.5 h-3.5 text-indigo-400" />
-                  Мій мікрофон
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                    <Mic className="w-3.5 h-3.5 text-indigo-400" />
+                    Мій мікрофон
+                  </label>
+                  {onRefreshDevices && (
+                    <button
+                      type="button"
+                      onClick={onRefreshDevices}
+                      disabled={state.is_call_active || isRefreshingDevices}
+                      className="text-[11px] text-slate-400 hover:text-indigo-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                      title="Оновити список пристроїв (Bluetooth / USB)"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isRefreshingDevices ? "animate-spin text-indigo-400" : ""}`} />
+                      <span>{isRefreshingDevices ? "Оновлення..." : "Оновити"}</span>
+                    </button>
+                  )}
+                </div>
                 <select
                   value={myMicIndex}
                   onChange={(e) => onSelectMyMic(Number(e.target.value))}
@@ -276,12 +295,26 @@ export const CallView = React.memo<CallViewProps>(({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                Мої навушники / динаміки (вихід перекладу)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Мої навушники / динаміки (вихід перекладу)
+                </label>
+                {onRefreshDevices && (
+                  <button
+                    type="button"
+                    onClick={onRefreshDevices}
+                    disabled={state.is_call_active || isRefreshingDevices}
+                    className="text-[11px] text-slate-400 hover:text-emerald-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                    title="Оновити список пристроїв (Bluetooth / USB)"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isRefreshingDevices ? "animate-spin text-emerald-400" : ""}`} />
+                    <span>{isRefreshingDevices ? "Оновлення..." : "Оновити"}</span>
+                  </button>
+                )}
+              </div>
               <select
-                value={headphonesIndex}
+                value={headphonesIndex ?? ""}
                 onChange={(e) => onSelectHeadphones(Number(e.target.value))}
                 disabled={state.is_call_active}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50"

@@ -18,6 +18,7 @@ import {
   Radio,
   Layers,
   Info,
+  RefreshCw,
 } from "lucide-react";
 
 import { VoiceSelector } from "./voices/VoiceSelector";
@@ -30,6 +31,8 @@ interface DubbingViewProps {
   onSelectDubbingInput: (index: number) => void;
   headphonesIndex?: number;
   onSelectHeadphones: (index: number) => void;
+  onRefreshDevices?: () => void;
+  isRefreshingDevices?: boolean;
   sourceLangLabel: string;
   sourceLangCode: string;
   dubbingVoice: VoiceSelection;
@@ -49,6 +52,8 @@ export const DubbingView = React.memo<DubbingViewProps>(({
   onSelectDubbingInput,
   headphonesIndex,
   onSelectHeadphones,
+  onRefreshDevices,
+  isRefreshingDevices = false,
   sourceLangLabel,
   sourceLangCode,
   dubbingVoice,
@@ -173,13 +178,24 @@ export const DubbingView = React.memo<DubbingViewProps>(({
 
             {/* Output Device (Headphones) */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
                   <Headphones className="w-3.5 h-3.5 text-indigo-400" />
                   Вихідний пристрій (Навушники / Динаміки)
-                </span>
-                <span className="text-[11px] text-slate-400">Куди чути дубляж</span>
-              </label>
+                </label>
+                {onRefreshDevices && (
+                  <button
+                    type="button"
+                    onClick={onRefreshDevices}
+                    disabled={isDubbing || isAnyOtherActive || isRefreshingDevices}
+                    className="text-[11px] text-slate-400 hover:text-indigo-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                    title="Оновити список пристроїв (Bluetooth / USB)"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isRefreshingDevices ? "animate-spin text-indigo-400" : ""}`} />
+                    <span>{isRefreshingDevices ? "Оновлення..." : "Оновити"}</span>
+                  </button>
+                )}
+              </div>
               <select
                 value={headphonesIndex ?? ""}
                 onChange={(e) => onSelectHeadphones(Number(e.target.value))}

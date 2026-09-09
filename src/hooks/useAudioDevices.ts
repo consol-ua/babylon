@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchAudioDevices, fetchVoices, fetchSamples, AudioDevice, SampleInfo, GeminiVoice } from '../api';
 import { DEFAULT_VOICES } from '../constants';
 
@@ -18,6 +18,8 @@ export interface AudioDeviceState {
   setCallInputIndex: (idx: number) => void;
   setDubbingInputIndex: (idx: number) => void;
   setHeadphonesIndex: (idx: number) => void;
+  refreshDevices: () => Promise<void>;
+  isRefreshingDevices: boolean;
   isLoopbackRisk: boolean;
 }
 
@@ -25,12 +27,93 @@ export function useAudioDevices(): AudioDeviceState {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [samples, setSamples] = useState<SampleInfo[]>([]);
   const [voices, setVoices] = useState<GeminiVoice[]>(DEFAULT_VOICES);
+  const [isRefreshingDevices, setIsRefreshingDevices] = useState<boolean>(false);
 
   const [myMicIndex, setMyMicIndex] = useState<number | undefined>();
   const [callVirtualMicIndex, setCallVirtualMicIndex] = useState<number | undefined>();
   const [callInputIndex, setCallInputIndex] = useState<number | undefined>();
   const [dubbingInputIndex, setDubbingInputIndex] = useState<number | undefined>();
   const [headphonesIndex, setHeadphonesIndex] = useState<number | undefined>();
+
+  const devicesRef = useRef<AudioDevice[]>([]);
+  devicesRef.current = devices;
+
+  const refreshDevices = useCallback(async () => {
+    setIsRefreshingDevices(true);
+    try {
+      const devs = await fetchAudioDevices();
+      setDevices(devs);
+
+      const inputs = devs.filter((d) => d.max_input_channels > 0);
+      const outputs = devs.filter((d) => d.max_output_channels > 0);
+      const prevDevices = devicesRef.current;
+
+      setMyMicIndex((prevIdx) => {
+        const prevDev = prevDevices.find((d) => d.index === prevIdx);
+        if (prevDev) {
+          const match = inputs.find((d) => d.name === prevDev.name);
+          if (match) return match.index;
+        }
+        if (prevIdx !== undefined && inputs.some((d) => d.index === prevIdx)) return prevIdx;
+        const defaultMic = inputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || inputs[0];
+        return defaultMic?.index;
+      });
+
+      setHeadphonesIndex((prevIdx) => {
+        const prevDev = prevDevices.find((d) => d.index === prevIdx);
+        if (prevDev) {
+          const match = outputs.find((d) => d.name === prevDev.name);
+          if (match) return match.index;
+        }
+        if (prevIdx !== undefined && outputs.some((d) => d.index === prevIdx)) return prevIdx;
+        const defaultHeadphones = outputs.find((d) => !d.name.toLowerCase().includes("blackhole")) || outputs[0];
+        return defaultHeadphones?.index;
+      });
+
+      setCallVirtualMicIndex((prevIdx) => {
+        const prevDev = prevDevices.find((d) => d.index === prevIdx);
+        if (prevDev) {
+          const match = outputs.find((d) => d.name === prevDev.name);
+          if (match) return match.index;
+        }
+        if (prevIdx !== undefined && outputs.some((d) => d.index === prevIdx)) return prevIdx;
+        const blackhole2chOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole 2ch"));
+        const blackholeGeneralOut = outputs.find((d) => d.name.toLowerCase().includes("blackhole"));
+        return (blackhole2chOut || blackholeGeneralOut)?.index;
+      });
+
+      setCallInputIndex((prevIdx) => {
+        const prevDev = prevDevices.find((d) => d.index === prevIdx);
+        if (prevDev) {
+          const match = inputs.find((d) => d.name === prevDev.name);
+          if (match) return match.index;
+        }
+        if (prevIdx !== undefined && inputs.some((d) => d.index === prevIdx)) return prevIdx;
+        const blackhole16chIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole 16ch"));
+        const blackhole64chIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole 64ch"));
+        const otherVirtualIn = inputs.find((d) => d.name.toLowerCase().includes("blackhole"));
+        return (blackhole16chIn || blackhole64chIn || otherVirtualIn)?.index;
+      });
+
+      setDubbingInputIndex((prevIdx) => {
+        const prevDev = prevDevices.find((d) => d.index === prevIdx);
+        if (prevDev) {
+          const match = inputs.find((d) => d.name === prevDev.name);
+          if (match) return match.index;
+        }
+        if (prevIdx !== undefined && inputs.some((d) => d.index === prevIdx)) return prevIdx;
+        const dubbingIn =
+          inputs.find((d) => d.name.toLowerCase().includes("blackhole 16ch")) ||
+          inputs.find((d) => d.name.toLowerCase().includes("blackhole")) ||
+          inputs[0];
+        return dubbingIn?.index;
+      });
+    } catch (err) {
+      console.error("[useAudioDevices] refresh error:", err);
+    } finally {
+      setIsRefreshingDevices(false);
+    }
+  }, []);
 
   useEffect(() => {
     Promise.all([fetchAudioDevices(), fetchSamples(), fetchVoices()]).then(
@@ -78,7 +161,30 @@ export function useAudioDevices(): AudioDeviceState {
         if (defaultHeadphones) setHeadphonesIndex(defaultHeadphones.index);
       }
     );
-  }, []);
+
+    const handleDeviceChange = () => {
+      refreshDevices();
+    };
+    const handleFocus = () => {
+      refreshDevices();
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+    }
+
+    return () => {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.removeEventListener) {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+      }
+    };
+  }, [refreshDevices]);
 
   const inputDevices = useMemo(() => devices.filter(d => d.max_input_channels > 0), [devices]);
   const outputDevices = useMemo(() => devices.filter(d => d.max_output_channels > 0), [devices]);
@@ -124,6 +230,8 @@ export function useAudioDevices(): AudioDeviceState {
     setCallInputIndex,
     setDubbingInputIndex,
     setHeadphonesIndex,
+    refreshDevices,
+    isRefreshingDevices,
     isLoopbackRisk
   };
 }

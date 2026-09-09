@@ -8,9 +8,10 @@ import numpy as np
 import pyaudio
 from typing import List, Dict, Optional, Callable
 import threading
-
-import threading
+import logging
 from collections import deque
+
+logger = logging.getLogger(__name__)
 
 
 class AudioStreamBuffer:
@@ -269,6 +270,22 @@ class DualChannelAudioEngine:
         """List all available audio input and output devices."""
         devices: List[Dict[str, str | int]] = []
         with self._stream_lock:
+            # Re-initialize PyAudio when idle to discover newly connected/disconnected devices (e.g. Bluetooth, USB)
+            if not (
+                self.is_call_running
+                or self.is_dubbing_running
+                or self.is_sample_running
+                or self.is_mic_test_running
+            ):
+                try:
+                    self.p.terminate()
+                except Exception:
+                    pass
+                try:
+                    self.p = pyaudio.PyAudio()
+                except Exception as e:
+                    logger.warning(f"Could not re-initialize PyAudio during list_devices: {e}")
+
             device_count = self.p.get_device_count()
             for i in range(device_count):
                 try:

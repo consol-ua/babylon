@@ -16,6 +16,7 @@ import {
   Eye,
   EyeOff,
   Video,
+  RefreshCw,
 } from "lucide-react";
 
 import { VoiceSelection } from "./types/voice";
@@ -65,8 +66,25 @@ export const App: React.FC = () => {
           </p>
         </div>
 
-        {/* Global Status Indicators */}
+        {/* Global Status Indicators & Actions */}
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => audioDevices.refreshDevices()}
+            disabled={
+              backendState.is_call_active ||
+              backendState.is_dubbing_active ||
+              backendState.is_testing_active ||
+              backendState.is_mic_test_active ||
+              audioDevices.isRefreshingDevices
+            }
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-750 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-indigo-300 transition-colors disabled:opacity-50"
+            title="Оновити список підключених аудіопристроїв (навушники, мікрофони)"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${audioDevices.isRefreshingDevices ? "animate-spin" : ""}`} />
+            <span>{audioDevices.isRefreshingDevices ? "Оновлення..." : "Оновити пристрої"}</span>
+          </button>
+
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
             <span
               className={`inline-block w-2.5 h-2.5 rounded-full ${
@@ -204,6 +222,8 @@ export const App: React.FC = () => {
             onSelectCallInput={audioDevices.setCallInputIndex}
             headphonesIndex={audioDevices.headphonesIndex}
             onSelectHeadphones={audioDevices.setHeadphonesIndex}
+            onRefreshDevices={audioDevices.refreshDevices}
+            isRefreshingDevices={audioDevices.isRefreshingDevices}
             partnerLangLabel={partnerLangOption.label}
             partnerLangCode={partnerLangOption.code}
             outgoingVoice={outgoingVoice}
@@ -237,6 +257,8 @@ export const App: React.FC = () => {
             onSelectDubbingInput={audioDevices.setDubbingInputIndex}
             headphonesIndex={audioDevices.headphonesIndex}
             onSelectHeadphones={audioDevices.setHeadphonesIndex}
+            onRefreshDevices={audioDevices.refreshDevices}
+            isRefreshingDevices={audioDevices.isRefreshingDevices}
             sourceLangLabel={partnerLangOption.label}
             sourceLangCode={partnerLangOption.code}
             dubbingVoice={dubbingVoice}
@@ -268,6 +290,8 @@ export const App: React.FC = () => {
             onSelectMyMic={audioDevices.setMyMicIndex}
             headphonesIndex={audioDevices.headphonesIndex}
             onSelectHeadphones={audioDevices.setHeadphonesIndex}
+            onRefreshDevices={audioDevices.refreshDevices}
+            isRefreshingDevices={audioDevices.isRefreshingDevices}
             partnerLangLabel={partnerLangOption.label}
             partnerLangCode={partnerLangOption.code}
             sampleVoice={sampleVoice}
